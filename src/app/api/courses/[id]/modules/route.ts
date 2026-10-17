@@ -9,7 +9,7 @@ import Course from '@/app/models/Course';
 // ✅ POST: Agregar un módulo/contenido a un curso
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } 
 ) {
   try {
     await connectDB();
@@ -19,7 +19,7 @@ export async function POST(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const courseId = params.id;
+    const courseId = (await params).id;
     const course = await Course.findById(courseId);
 
     if (!course) {
@@ -72,11 +72,11 @@ export async function POST(
 // ✅ GET: Obtener los módulos de un curso
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-    const courseId = params.id;
+    const courseId = (await params).id;
     
     const course = await Course.findById(courseId).select('modules title status');
     

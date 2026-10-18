@@ -90,11 +90,11 @@ export default function StudentCourseDetailPage() {
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto mt-40 px-4 sm:px-6 lg:px-8 py-12">
-        
+
         {/* Header con botón de volver */}
         <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => router.push('/aula/mis-cursos')} 
+          <button
+            onClick={() => router.push('/aula/mis-cursos')}
             className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
           >
             <FaArrowLeft />
@@ -106,24 +106,30 @@ export default function StudentCourseDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Columna Izquierda: Info y Clase en Vivo */}
+
+          {/* Columna Izquierda: Info y Clase en Vivo (Vista Alumno) */}
           <div className="lg:col-span-1 space-y-6">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <FaVideo className="text-emerald-400" /> Clase en Vivo
+                <FaVideo className="text-emerald-400" /> Aula Virtual
               </h3>
               <p className="text-sm text-slate-400 mb-6">
-                Únete a la sesión sincrónica con tu profesor y compañeros. Asegúrate de tener tu micrófono y cámara listos.
+                Esta es la sala virtual de tu curso. <strong>Ingresa cuando el profesor haya iniciado la clase.</strong> Si entras antes, quedarás en la sala de espera hasta que él te admita.
               </p>
-              <button 
+
+              <button
                 onClick={handleJoinLiveClass}
                 className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
               >
                 <FaVideo className="w-5 h-5" />
-                Ingresar al Aula
+                Unirse al Aula Virtual
                 <FaExternalLinkAlt className="w-3 h-3 opacity-70" />
               </button>
+
+              <p className="text-[10px] text-slate-500 text-center mt-4 flex items-center justify-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                El enlace es único y permanente para este curso.
+              </p>
             </div>
           </div>
 
@@ -146,7 +152,7 @@ export default function StudentCourseDetailPage() {
                       <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700 group-hover:border-emerald-500/50 transition-colors">
                         {getModuleIcon(module.type)}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
@@ -156,7 +162,7 @@ export default function StudentCourseDetailPage() {
                             {module.type}
                           </span>
                         </div>
-                        
+
                         <h4 className="text-white font-semibold mb-1">{module.title}</h4>
                         {module.description && (
                           <p className="text-sm text-slate-400 mb-3">{module.description}</p>
@@ -168,9 +174,9 @@ export default function StudentCourseDetailPage() {
                             {module.content}
                           </div>
                         ) : (
-                          <a 
-                            href={module.content} 
-                            target="_blank" 
+                          <a
+                            href={module.content}
+                            target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors border border-slate-700"
                           >

@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -541,8 +541,36 @@ export default function CursosPage() {
                 </div>
               </div>
 
+              {/* Reemplaza o agrega este bloque de botones al final del modal de detalles del profesor */}
               {canCreate && (
                 <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-slate-800">
+
+                  {/* ✅ NUEVO BOTÓN: INICIAR CLASE EN VIVO (Solo para el profesor) */}
+                  <button
+                    onClick={() => {
+                      const roomName = `AulaVirtual-${selectedCourse.title.replace(/\s+/g, '-')}-${selectedCourse._id}`;
+                      const jitsiUrl = `https://meet.jit.si/${roomName}#config.startWithAudioMuted=true&config.startWithVideoMuted=true&userInfo.displayName=${encodeURIComponent(session?.user?.name || 'Profesor')}`;
+
+                      // Copiar el enlace al portapapeles
+                      navigator.clipboard.writeText(jitsiUrl).then(() => {
+                        Swal.fire({
+                          icon: 'success',
+                          title: '¡Clase Iniciada!',
+                          html: `El enlace del aula se ha copiado al portapapeles.<br><br><code class="bg-slate-800 p-2 rounded text-xs break-all text-emerald-400">${jitsiUrl}</code><br><br>Puedes pegarlo en WhatsApp o en el grupo del curso para que los alumnos se unan.`,
+                          background: '#0f172a',
+                          color: '#f1f5f9',
+                          confirmButtonColor: '#ef4444',
+                          customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+                        });
+                        // Abrir la clase para el profesor
+                        window.open(jitsiUrl, '_blank');
+                      });
+                    }}
+                    className="px-5 py-2.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors flex items-center gap-2 shadow-lg shadow-red-900/20"
+                  >
+                    <FaVideo className="w-4 h-4" /> Iniciar Clase en Vivo
+                  </button>
+
                   <button onClick={() => router.push(`/aula/cursos/${selectedCourse._id}/contenido`)} className="px-5 py-2.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors flex items-center gap-2">
                     <FaBookOpen className="w-4 h-4" /> Gestionar Contenido
                   </button>

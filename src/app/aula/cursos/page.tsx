@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo } from 'react-icons/fa';
+import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo, FaRegSmile, FaCheckCircle, FaQuoteLeft, FaLightbulb } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -69,6 +69,8 @@ export default function CursosPage() {
     if (status === 'authenticated') fetchCourses();
   }, [status]);
 
+
+
   // 📝 Inicializar notas cuando se abre el modal
   useEffect(() => {
     if (selectedCourse) {
@@ -91,6 +93,8 @@ export default function CursosPage() {
       setStudentNotes(initialNotes);
     }
   }, [selectedCourse]);
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,6 +144,7 @@ export default function CursosPage() {
       setSubmitting(false);
     }
   };
+
 
   const handleEditClick = (course: Course) => {
     setFormData({
@@ -215,6 +220,7 @@ export default function CursosPage() {
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
 
+
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -243,6 +249,7 @@ export default function CursosPage() {
             </button>
           )}
         </div>
+
 
         {courses.length === 0 ? (
           <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-12 text-center`}>
@@ -291,6 +298,8 @@ export default function CursosPage() {
         )}
       </div>
 
+
+
       {/* ───────── MODAL DE FORMULARIO (CREAR / EDITAR) ───────── */}
       {isFormModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setIsFormModalOpen(false)}>
@@ -327,6 +336,8 @@ export default function CursosPage() {
           </div>
         </div>
       )}
+
+
 
       {/* ───────── MODAL DE DETALLES DEL CURSO ───────── */}
       {selectedCourse && (
@@ -365,6 +376,8 @@ export default function CursosPage() {
                   <p className="text-sm text-slate-500">{selectedCourse.professor?.email || ''}</p>
                 </div>
 
+
+
                 {/* 📝 SECCIÓN DE ALUMNOS Y NOTAS (LÓGICA ACTUALIZADA) */}
                 <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 sm:col-span-2">
                   <div className="flex items-center gap-3 mb-4">
@@ -401,11 +414,58 @@ export default function CursosPage() {
                                 Inscrito
                               </span>
                             </div>
+                        
+
+
+                            {/* 📝 SECCIÓN DE NOTA DEL PROFESOR (Diseño Estudiantil Mejorado) */}
+                            <div className="mt-6">
+                              <div className="relative p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 via-violet-500/5 to-slate-900/50 border border-amber-500/20 backdrop-blur-sm shadow-lg">
+
+                                {/* Badge flotante superior */}
+                                <div className="absolute -top-3.5 left-5 px-3 py-1.5 rounded-full bg-slate-950 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
+                                  <FaLightbulb className="w-3.5 h-3.5" />
+                                Notas del profesor
+                                </div>
+
+                                {currentNote.note ? (
+                                  <div className="mt-3">
+                                    {/* Cita estilizada */}
+                                    <div className="relative pl-4 py-1">
+                                      <FaQuoteLeft className="absolute -left-1 top-0 w-4 h-4 text-amber-500/30" />
+                                      <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic font-light">
+                                        "{currentNote.note}"
+                                      </p>
+                                    </div>
+
+                                    {/* Footer de la nota */}
+                                    <div className="mt-4 pt-3 border-t border-amber-500/10 flex items-center justify-between">
+                                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                                        <FaCheckCircle className="text-emerald-500 w-3.5 h-3.5" />
+                                        <span>Compartido por tu docente</span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-600 uppercase tracking-wider">
+                                        {new Date().toLocaleDateString('es-AR', { month: 'short', day: 'numeric' })}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* Estado vacío motivador */
+                                  <div className="mt-3 text-center py-4">
+                                    <FaRegSmile className="mx-auto w-8 h-8 text-slate-600 mb-2" />
+                                    <p className="text-slate-300 text-sm font-medium">¡Todo en orden!</p>
+                                    <p className="text-slate-500 text-xs mt-1">
+                                      Tu profesor aún no ha dejado notas específicas para ti. <br />
+                                      ¡Sigue participando y aprovechando el curso! 🚀
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
 
                             <div className="space-y-3 pt-3 border-t border-slate-700/50">
                               <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
-                                  📝 Nota del profesor
+                                  📝 ingresar Nota
                                 </label>
                                 <textarea
                                   value={currentNote.note}

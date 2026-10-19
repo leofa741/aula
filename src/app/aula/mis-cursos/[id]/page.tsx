@@ -13,14 +13,25 @@ const theme = {
   textSecondary: 'text-slate-400',
 };
 
+// ✅ Hacemos 'type' opcional (?) por compatibilidad con módulos antiguos
 interface Module {
   _id: string;
   title: string;
   description: string;
   content: string;
-  type: 'texto' | 'video' | 'pdf' | 'enlace';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace';
   order: number;
 }
+
+// ✅ FUNCIÓN PARA ASEGURAR QUE LA URL SEA ABSOLUTA Y NO DÉ 404
+const formatUrl = (url: string) => {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
 
 export default function StudentCourseDetailPage() {
   const { data: session, status } = useSession();
@@ -39,14 +50,13 @@ export default function StudentCourseDetailPage() {
   useEffect(() => {
     const fetchCourseData = async () => {
       try {
-        // Usamos la misma API que usa el profesor, ya que devuelve los módulos
         const res = await fetch(`/api/courses/${courseId}/modules`);
         if (res.ok) {
           const data = await res.json();
           setCourseTitle(data.courseTitle);
           setModules(data.modules || []);
         } else {
-          router.push('/aula/mis-cursos'); // Redirigir si no tiene acceso
+          router.push('/aula/mis-cursos');
         }
       } catch (error) {
         console.error('Error cargando el curso:', error);
@@ -66,7 +76,9 @@ export default function StudentCourseDetailPage() {
     window.open(jitsiUrl, '_blank');
   };
 
-  const getModuleIcon = (type: string) => {
+  // ✅ Aceptamos undefined para el tipo
+  const getModuleIcon = (type: string | undefined) => {
+    if (!type) return <FaFileAlt className="text-slate-400 text-xl" />;
     switch (type) {
       case 'video': return <FaPlayCircle className="text-red-500 text-xl" />;
       case 'pdf': return <FaFilePdf className="text-rose-500 text-xl" />;
@@ -107,7 +119,7 @@ export default function StudentCourseDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          {/* Columna Izquierda: Info y Clase en Vivo (Vista Alumno) */}
+          {/* Columna Izquierda: Info y Clase en Vivo */}
           <div className="lg:col-span-1 space-y-6">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -146,48 +158,53 @@ export default function StudentCourseDetailPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {modules.map((module, index) => (
-                  <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-emerald-500/30 transition-colors group`}>
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700 group-hover:border-emerald-500/50 transition-colors">
-                        {getModuleIcon(module.type)}
-                      </div>
+                {modules.map((module, index) => {
+                  // ✅ AQUÍ ESTÁ LA MAGIA: Si 'type' no existe, asume por defecto que es 'texto'
+                  const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                            Módulo {module.order}
-                          </span>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">
-                            {module.type}
-                          </span>
+                  return (
+                    <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-emerald-500/30 transition-colors group`}>
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700 group-hover:border-emerald-500/50 transition-colors">
+                          {getModuleIcon(module.type)}
                         </div>
 
-                        <h4 className="text-white font-semibold mb-1">{module.title}</h4>
-                        {module.description && (
-                          <p className="text-sm text-slate-400 mb-3">{module.description}</p>
-                        )}
-
-                        {/* Renderizado del contenido según el tipo */}
-                        {module.type === 'texto' ? (
-                          <div className="mt-3 p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap">
-                            {module.content}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
+                              Módulo {module.order}
+                            </span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">
+                              {moduleType}
+                            </span>
                           </div>
-                        ) : (
-                          <a
-                            href={module.content}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors border border-slate-700"
-                          >
-                            {module.type === 'video' ? 'Ver Video' : module.type === 'pdf' ? 'Descargar PDF' : 'Abrir Enlace'}
-                            <FaExternalLinkAlt className="w-3 h-3" />
-                          </a>
-                        )}
+
+                          <h4 className="text-white font-semibold mb-1">{module.title}</h4>
+                          {module.description && (
+                            <p className="text-sm text-slate-400 mb-3">{module.description}</p>
+                          )}
+
+                          {/* ✅ CONDICIÓN A PRUEBA DE FALLOS */}
+                          {moduleType === 'texto' ? (
+                            <div className="mt-3 p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                              {module.content}
+                            </div>
+                          ) : (
+                            <a
+                              href={formatUrl(module.content)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors border border-slate-700"
+                            >
+                              {moduleType === 'video' ? 'Ver Video' : moduleType === 'pdf' ? 'Descargar PDF' : 'Abrir Enlace'}
+                              <FaExternalLinkAlt className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

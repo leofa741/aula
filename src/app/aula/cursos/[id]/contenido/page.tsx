@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -19,9 +19,18 @@ interface Module {
   title: string;
   description: string;
   content: string;
-  type: 'texto' | 'video' | 'pdf' | 'enlace';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace'; // ✅ Hacemos 'type' opcional (?) por compatibilidad
   order: number;
 }
+
+const formatUrl = (url: string) => {
+  if (!url) return '#';
+  const trimmed = url.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  return `https://${trimmed}`;
+};
 
 export default function CursoContenidoPage() {
   const { data: session, status } = useSession();
@@ -33,7 +42,6 @@ export default function CursoContenidoPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Estado del formulario
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -54,7 +62,7 @@ export default function CursoContenidoPage() {
         setCourseTitle(data.courseTitle);
         setModules(data.modules || []);
       } else {
-        router.push('/aula/cursos'); // Redirigir si no existe o no tiene permiso
+        router.push('/aula/cursos');
       }
     } catch (error) {
       console.error('Error cargando módulos:', error);
@@ -110,7 +118,8 @@ export default function CursoContenidoPage() {
     }
   };
 
-  const getIcon = (type: string) => {
+  const getIcon = (type: string | undefined) => {
+    if (!type) return <FaFileAlt className="text-slate-400" />;
     switch (type) {
       case 'video': return <FaYoutube className="text-red-500" />;
       case 'pdf': return <FaFilePdf className="text-rose-500" />;
@@ -134,7 +143,6 @@ export default function CursoContenidoPage() {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 mt-40 sm:px-6 lg:px-8 py-12">
-        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button 
             onClick={() => router.push('/aula/cursos')} 
@@ -149,7 +157,6 @@ export default function CursoContenidoPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Formulario de Agregado */}
           <div className="lg:col-span-1">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -191,7 +198,7 @@ export default function CursoContenidoPage() {
                     required 
                     rows={4}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm resize-none" 
-                    placeholder={formData.type === 'texto' ? 'Escribe las instrucciones o el contenido aquí...' : 'https://...'}
+                    placeholder={formData.type === 'texto' ? 'Escribe las instrucciones o el contenido aquí...' : 'Ej: https://youtube.com/watch?v=...'}
                   />
                 </div>
 
@@ -217,7 +224,6 @@ export default function CursoContenidoPage() {
             </div>
           </div>
 
-          {/* Lista de Módulos Existentes */}
           <div className="lg:col-span-2 space-y-4">
             <h3 className="text-lg font-bold text-white mb-2">Contenido del Curso ({modules.length})</h3>
             
@@ -227,45 +233,57 @@ export default function CursoContenidoPage() {
                 <p className="text-slate-500 text-sm mt-1">Usa el formulario para agregar el primer módulo.</p>
               </div>
             ) : (
-              modules.map((module, index) => (
-                <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
-                        {getIcon(module.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
-                          <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">{module.type}</span>
+              modules.map((module, index) => {
+                // ✅ AQUÍ ESTÁ LA MAGIA: Si 'type' no existe (undefined), asume por defecto que es 'texto'
+                const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
+
+                return (
+                  <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
+                          {getIcon(module.type)}
                         </div>
-                        <h4 className="text-white font-semibold mb-1">{module.title}</h4>
-                        {module.description && <p className="text-sm text-slate-400 mb-2">{module.description}</p>}
-                        
-                        {module.type !== 'texto' ? (
-                          <a 
-                            href={module.content} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:underline mt-1"
-                          >
-                            Ver contenido →
-                          </a>
-                        ) : (
-                          <p className="text-sm text-slate-300 bg-slate-950/50 p-3 rounded-lg border border-slate-800 mt-2 whitespace-pre-wrap">
-                            {module.content}
-                          </p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
+                            <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">
+                              {moduleType}
+                            </span>
+                          </div>
+                          <h4 className="text-white font-semibold mb-1">{module.title}</h4>
+                          {module.description && <p className="text-sm text-slate-400 mb-2">{module.description}</p>}
+                          
+                          {/* ✅ CONDICIÓN A PRUEBA DE FALLOS: Si es 'texto' (o no tiene tipo), muestra el texto. */}
+                          {moduleType === 'texto' ? (
+                            <div className="mt-2 p-4 rounded-lg bg-slate-950/50 border border-slate-800">
+                              <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                                {module.content}
+                              </p>
+                            </div>
+                          ) : (
+                            <a 
+                              href={formatUrl(module.content)} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:underline mt-2 font-medium"
+                            >
+                              Abrir recurso externo <FaExternalLinkAlt className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
                       </div>
+                      
+                      <button 
+                        className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Eliminar módulo"
+                      >
+                        <FaTrash />
+                      </button>
                     </div>
-                    
-                    {/* Botón de eliminar (Placeholder para futura funcionalidad) */}
-                    <button className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100">
-                      <FaTrash />
-                    </button>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>

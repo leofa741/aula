@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import connectDB from '@/app/lib/mongoose';
 import { authOptions } from '@/app/lib/auth';
 import Course from '@/app/models/Course';
+import StudentNote from '@/app/models/StudentNote';
 
 
 
@@ -69,25 +70,50 @@ export async function POST(
   }
 }
 
-// ✅ GET: Obtener los módulos de un curso
+
+
+// ✅ 2. REEMPLAZA TU MÉTODO GET POR ESTE:
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();
-    const courseId = (await params).id;
+    const courseId = params.id;
     
+    // Obtenemos solo los módulos y el título para no cargar datos innecesarios
     const course = await Course.findById(courseId).select('modules title status');
-    
     if (!course) {
       return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
     }
 
-    // Ordenar módulos por el campo 'order'
     const sortedModules = course.modules.sort((a: any, b: any) => a.order - b.order);
 
-    return NextResponse.json({ success: true, modules: sortedModules, courseTitle: course.title }, { status: 200 });
+    // ✅ 3. LÓGICA CLAVE: Buscar la nota del alumno actual
+    let studentNote = null;
+    const session = await getServerSession(authOptions);
+    
+    // Solo buscamos si hay un usuario logueado
+    if (session?.user?.id) {
+      const noteDoc = await StudentNote.findOne({ 
+        courseId, 
+        studentId: session.user.id,
+        isVisibleToStudent: true // 🔒 SEGURIDAD: Solo traemos la nota si el profesor la marcó como visible
+      });
+      
+      if (noteDoc && noteDoc.note) {
+        studentNote = noteDoc.note;
+      }
+    }
+
+    // ✅ 4. Enviamos todo junto al frontend
+    return NextResponse.json({ 
+      success: true, 
+      modules: sortedModules, 
+      courseTitle: course.title,
+      studentNote // <-- Aquí va la nota (o null si no tiene o no es visible)
+    }, { status: 200 });
+
   } catch (error: any) {
     console.error('Error al obtener módulos:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });

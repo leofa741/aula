@@ -3,7 +3,8 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt } from 'react-icons/fa';
+// ✅ NUEVO 1: Agregamos los iconos para el diseño de la nota
+import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaQuoteLeft, FaCheckCircle } from 'react-icons/fa';
 
 const theme = {
   bg: 'bg-slate-950',
@@ -13,7 +14,6 @@ const theme = {
   textSecondary: 'text-slate-400',
 };
 
-// ✅ Hacemos 'type' opcional (?) por compatibilidad con módulos antiguos
 interface Module {
   _id: string;
   title: string;
@@ -23,7 +23,6 @@ interface Module {
   order: number;
 }
 
-// ✅ FUNCIÓN PARA ASEGURAR QUE LA URL SEA ABSOLUTA Y NO DÉ 404
 const formatUrl = (url: string) => {
   if (!url) return '#';
   const trimmed = url.trim();
@@ -41,6 +40,10 @@ export default function StudentCourseDetailPage() {
 
   const [courseTitle, setCourseTitle] = useState('');
   const [modules, setModules] = useState<Module[]>([]);
+  
+  // ✅ NUEVO 2: Estado para guardar la nota que viene del servidor
+  const [studentNote, setStudentNote] = useState<string | null>(null);
+  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -55,6 +58,9 @@ export default function StudentCourseDetailPage() {
           const data = await res.json();
           setCourseTitle(data.courseTitle);
           setModules(data.modules || []);
+          
+          // ✅ NUEVO 3: Guardamos la nota si el servidor la envió (solo si es visible)
+          setStudentNote(data.studentNote || null);
         } else {
           router.push('/aula/mis-cursos');
         }
@@ -76,7 +82,6 @@ export default function StudentCourseDetailPage() {
     window.open(jitsiUrl, '_blank');
   };
 
-  // ✅ Aceptamos undefined para el tipo
   const getModuleIcon = (type: string | undefined) => {
     if (!type) return <FaFileAlt className="text-slate-400 text-xl" />;
     switch (type) {
@@ -145,9 +150,31 @@ export default function StudentCourseDetailPage() {
             </div>
           </div>
 
-          {/* Columna Derecha: Lista de Módulos */}
-          <div className="lg:col-span-2">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          {/* Columna Derecha: Nota del Profesor + Lista de Módulos */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* ✅ NUEVO 4: Renderizado de la Nota (Solo aparece si studentNote tiene texto) */}
+            {studentNote && (
+              <div className="relative p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 via-violet-500/5 to-slate-900/50 border border-amber-500/20 backdrop-blur-sm shadow-lg">
+                <div className="absolute -top-3.5 left-5 px-3 py-1.5 rounded-full bg-slate-950 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
+                  <FaLightbulb className="w-3.5 h-3.5" /> Retroalimentación del Profesor
+                </div>
+                <div className="mt-3">
+                  <div className="relative pl-4 py-1">
+                    <FaQuoteLeft className="absolute -left-1 top-0 w-4 h-4 text-amber-500/30" />
+                    <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic font-light">
+                      "{studentNote}"
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-amber-500/10 flex items-center gap-2">
+                    <FaCheckCircle className="text-emerald-500 w-3.5 h-3.5" />
+                    <span className="text-xs text-slate-500">Compartido por tu docente</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
               Contenido del Curso ({modules.length} módulos)
             </h3>
 
@@ -159,7 +186,6 @@ export default function StudentCourseDetailPage() {
             ) : (
               <div className="space-y-4">
                 {modules.map((module, index) => {
-                  // ✅ AQUÍ ESTÁ LA MAGIA: Si 'type' no existe, asume por defecto que es 'texto'
                   const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
 
                   return (
@@ -184,7 +210,6 @@ export default function StudentCourseDetailPage() {
                             <p className="text-sm text-slate-400 mb-3">{module.description}</p>
                           )}
 
-                          {/* ✅ CONDICIÓN A PRUEBA DE FALLOS */}
                           {moduleType === 'texto' ? (
                             <div className="mt-3 p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
                               {module.content}

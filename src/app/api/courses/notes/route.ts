@@ -1,3 +1,5 @@
+// api/courses/notes/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/app/lib/mongoose'; 
 import StudentNote from '@/app/models/StudentNote'; 

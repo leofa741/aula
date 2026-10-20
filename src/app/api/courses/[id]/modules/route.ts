@@ -75,11 +75,11 @@ export async function POST(
 // ✅ 2. REEMPLAZA TU MÉTODO GET POR ESTE:
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB();
-    const courseId = params.id;
+    const courseId = (await params).id;
     
     // Obtenemos solo los módulos y el título para no cargar datos innecesarios
     const course = await Course.findById(courseId).select('modules title status');

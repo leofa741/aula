@@ -133,8 +133,8 @@ const Footer = () => {
           {/* Grid principal */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 lg:gap-8">
             
-            {/* ───────── COLUMNA 1-4: MARCA ───────── */}
-            <div className="lg:col-span-4">
+            {/* ───────── COLUMNA 1-6: MARCA ───────── */}
+            <div className="lg:col-span-6">
               <Link href="/" className="inline-block group mb-5">
                 <div className="flex items-center space-x-3">
                   {/* Glow detrás del logo */}
@@ -171,44 +171,10 @@ const Footer = () => {
               </button>
             </div>
 
-            {/* ───────── COLUMNA 5-7: CATEGORÍAS ───────── */}
-            <div className="lg:col-span-2">
-              <h3 className="text-sm tracking-[0.25em] uppercase text-slate-500 font-medium mb-5 relative inline-flex items-center">
-                CATEGORÍAS
-                <span className={`absolute -bottom-2 left-0 w-8 h-px bg-gradient-to-r ${gradients.accent}`} />
-              </h3>
-              <ul className="space-y-3">
-                {[
-                  { label: 'Peinados', href: '/categoria/peinados' },
-                  { label: 'Cortes', href: '/categoria/cortes' },
-                ].map((item) => (
-                  <li key={item.href}>
-                    <FooterLink href={item.href}>{item.label}</FooterLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                      
 
-            {/* ───────── COLUMNA 8-9: SERVICIOS ───────── */}
-            <div className="lg:col-span-2">
-              <h3 className="text-sm tracking-[0.25em] uppercase text-slate-500 font-medium mb-5 relative inline-flex items-center">
-                Servicios
-                <span className={`absolute -bottom-2 left-0 w-8 h-px bg-gradient-to-r ${gradients.accent}`} />
-              </h3>
-              <ul className="space-y-3">
-                {[
-                  { label: 'Peinados', href: '/servicios/peinados' },
-                  { label: 'Cortes', href: '/servicios/cortes' },
-                ].map((item) => (
-                  <li key={item.href}>
-                    <FooterLink href={item.href}>{item.label}</FooterLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* ───────── COLUMNA 10-12: CONTACTO ───────── */}
-            <div className="lg:col-span-4">
+            {/* ───────── COLUMNA 7-12: CONTACTO ───────── */}
+            <div className="lg:col-span-4 lg:col-start-9">
               <h3 className="text-sm tracking-[0.25em] uppercase text-slate-500 font-medium mb-5 relative inline-flex items-center">
                 Contacto
                 <span className={`absolute -bottom-2 left-0 w-8 h-px bg-gradient-to-r ${gradients.accent}`} />

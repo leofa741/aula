@@ -198,12 +198,12 @@ export default function PanelGestionPage() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-cyan-500/20 via-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 mt-40 sm:px-6 lg:px-8 py-12 sm:py-20">
+      <div className="relative z-10 max-w-7xl mx-auto px-4  sm:px-6 lg:px-8 py-12 sm:py-20">
 
         {/* Header del Dashboard */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 mb-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 mt-40 mb-4">
               <FaShieldAlt className="text-violet-400 text-xs" />
               <span className="text-[10px] tracking-[0.2em] uppercase text-slate-400">
                 Panel de {userRole === 'alumno' ? 'Estudiante' : 'Control'}

@@ -65,7 +65,7 @@ export default function MisCursosPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto  px-4 sm:px-6 lg:px-8 py-12">
-        <div className="mb-8">
+        <div className="mb-8 mt-40">
           <a href="/gestion" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm mb-4 sm:mb-0">
             <FaArrowLeft /> Volver a Gestión
           </a>

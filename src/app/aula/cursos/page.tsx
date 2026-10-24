@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo, FaRegSmile, FaCheckCircle, FaQuoteLeft, FaLightbulb } from 'react-icons/fa';
+import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo, FaRegSmile, FaCheckCircle, FaQuoteLeft, FaLightbulb, FaArrowLeft } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -228,8 +228,12 @@ export default function CursosPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto  px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-40 mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-20 mb-8 gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center mt-40 sm:gap-4">
+         
+            <a href="/gestion" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm mb-4 sm:mb-0">
+              <FaArrowLeft /> Volver a Gestión
+            </a>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-3">
               <FaBookOpen className="text-violet-400" />
               Gestión de Cursos

@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaBookOpen, FaSpinner, FaChalkboardTeacher, FaLock } from 'react-icons/fa';
+import { FaBookOpen, FaSpinner, FaChalkboardTeacher, FaLock, FaArrowLeft } from 'react-icons/fa';
 
 const theme = {
   bg: 'bg-slate-950',
@@ -64,8 +64,11 @@ export default function MisCursosPage() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-500/10 via-violet-500/10 to-fuchsia-500/10 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto mt-40 px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative z-10 max-w-7xl mx-auto  px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
+          <a href="/gestion" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm mb-4 sm:mb-0">
+            <FaArrowLeft /> Volver a Gestión
+          </a>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-3">
             <FaBookOpen className="text-emerald-400" />
             Mis Cursos

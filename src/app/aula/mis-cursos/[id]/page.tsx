@@ -3,8 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-// ✅ NUEVO 1: Agregamos los iconos para el diseño de la nota
-import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaQuoteLeft, FaCheckCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft } from 'react-icons/fa';
 
 const theme = {
   bg: 'bg-slate-950',
@@ -15,7 +14,8 @@ const theme = {
 };
 
 interface Module {
-  _id: string;
+  _id?: string;
+  id?: string;
   title: string;
   description: string;
   content: string;
@@ -40,10 +40,7 @@ export default function StudentCourseDetailPage() {
 
   const [courseTitle, setCourseTitle] = useState('');
   const [modules, setModules] = useState<Module[]>([]);
-  
-  // ✅ NUEVO 2: Estado para guardar la nota que viene del servidor
   const [studentNote, setStudentNote] = useState<string | null>(null);
-  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -58,8 +55,6 @@ export default function StudentCourseDetailPage() {
           const data = await res.json();
           setCourseTitle(data.courseTitle);
           setModules(data.modules || []);
-          
-          // ✅ NUEVO 3: Guardamos la nota si el servidor la envió (solo si es visible)
           setStudentNote(data.studentNote || null);
         } else {
           router.push('/aula/mis-cursos');
@@ -153,7 +148,7 @@ export default function StudentCourseDetailPage() {
           {/* Columna Derecha: Nota del Profesor + Lista de Módulos */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* ✅ NUEVO 4: Renderizado de la Nota (Solo aparece si studentNote tiene texto) */}
+            {/* Renderizado de la Nota */}
             {studentNote && (
               <div className="relative p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 via-violet-500/5 to-slate-900/50 border border-amber-500/20 backdrop-blur-sm shadow-lg">
                 <div className="absolute -top-3.5 left-5 px-3 py-1.5 rounded-full bg-slate-950 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
@@ -187,9 +182,13 @@ export default function StudentCourseDetailPage() {
               <div className="space-y-4">
                 {modules.map((module, index) => {
                   const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
+                  const safeKey = module._id || module.id || `module-${index}`;
+                  
+                  // ✅ LÓGICA INTELIGENTE: Detecta si el contenido es una URL, incluso si el tipo es "texto"
+                  const isUrlContent = module.content.trim().startsWith('http://') || module.content.trim().startsWith('https://');
 
                   return (
-                    <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-emerald-500/30 transition-colors group`}>
+                    <div key={safeKey} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-emerald-500/30 transition-colors group`}>
                       <div className="flex items-start gap-4">
                         <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 border border-slate-700 group-hover:border-emerald-500/50 transition-colors">
                           {getModuleIcon(module.type)}
@@ -210,7 +209,8 @@ export default function StudentCourseDetailPage() {
                             <p className="text-sm text-slate-400 mb-3">{module.description}</p>
                           )}
 
-                          {moduleType === 'texto' ? (
+                          {/* ✅ RENDERIZADO INTELIGENTE: Si es texto PERO contiene una URL, lo muestra como botón clicable */}
+                          {moduleType === 'texto' && !isUrlContent ? (
                             <div className="mt-3 p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
                               {module.content}
                             </div>
@@ -219,10 +219,10 @@ export default function StudentCourseDetailPage() {
                               href={formatUrl(module.content)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 mt-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-sm font-medium transition-colors border border-slate-700"
+                              className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300 transition-all text-sm font-semibold group/link"
                             >
-                              {moduleType === 'video' ? 'Ver Video' : moduleType === 'pdf' ? 'Descargar PDF' : 'Abrir Enlace'}
-                              <FaExternalLinkAlt className="w-3 h-3" />
+                              {moduleType === 'video' ? 'Ver Video' : moduleType === 'pdf' ? 'Abrir PDF' : 'Abrir Enlace'}
+                              <FaExternalLinkAlt className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
                             </a>
                           )}
                         </div>

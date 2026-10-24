@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -15,11 +15,12 @@ const theme = {
 };
 
 interface Module {
-  _id: string;
+  _id?: string;
+  id?: string;
   title: string;
   description: string;
   content: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace'; // ✅ Hacemos 'type' opcional (?) por compatibilidad
+  type?: 'texto' | 'video' | 'pdf' | 'enlace';
   order: number;
 }
 
@@ -48,7 +49,9 @@ export default function CursoContenidoPage() {
     content: '',
     type: 'texto' as 'texto' | 'video' | 'pdf' | 'enlace',
   });
+  
   const [submitting, setSubmitting] = useState(false);
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
@@ -75,13 +78,114 @@ export default function CursoContenidoPage() {
     if (status === 'authenticated' && courseId) fetchModules();
   }, [status, courseId]);
 
+  const handleEdit = (module: Module) => {
+    const moduleId = module._id || module.id || (module.order ? module.order.toString() : null);
+    
+    if (!moduleId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error de datos',
+        text: 'Este módulo no tiene un identificador válido para ser editado.',
+        background: '#0f172a',
+        color: '#f1f5f9',
+        confirmButtonColor: '#ef4444',
+        customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+      });
+      return;
+    }
+
+    setFormData({
+      title: module.title,
+      description: module.description || '',
+      content: module.content,
+      type: (module.type as any) || 'texto',
+    });
+    setEditingModuleId(moduleId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (module: Module) => {
+    const moduleId = module._id || module.id || (module.order ? module.order.toString() : null);
+
+    if (!moduleId) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'No se pudo identificar el módulo para eliminar.',
+        background: '#0f172a',
+        color: '#f1f5f9',
+        confirmButtonColor: '#ef4444',
+        customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: "No podrás revertir esta acción",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      background: '#0f172a',
+      color: '#f1f5f9',
+      customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}`, {
+          method: 'DELETE',
+        });
+
+        if (res.ok) {
+          if (editingModuleId === moduleId) {
+            setFormData({ title: '', description: '', content: '', type: 'texto' });
+            setEditingModuleId(null);
+          }
+          fetchModules();
+          Swal.fire({
+            icon: 'success',
+            title: 'Eliminado',
+            text: 'El módulo ha sido eliminado correctamente.',
+            background: '#0f172a',
+            color: '#f1f5f9',
+            confirmButtonColor: '#8b5cf6',
+            customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+          });
+        } else {
+          const data = await res.json();
+          throw new Error(data.error || 'Error al eliminar el módulo');
+        }
+      } catch (error: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: error.message,
+          background: '#0f172a',
+          color: '#f1f5f9',
+          confirmButtonColor: '#ef4444',
+          customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+        });
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
-      const res = await fetch(`/api/courses/${courseId}/modules`, {
-        method: 'POST',
+      const url = editingModuleId 
+        ? `/api/courses/${courseId}/modules/${editingModuleId}` 
+        : `/api/courses/${courseId}/modules`;
+      
+      const method = editingModuleId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
@@ -90,18 +194,19 @@ export default function CursoContenidoPage() {
 
       if (res.ok) {
         setFormData({ title: '', description: '', content: '', type: 'texto' });
+        setEditingModuleId(null);
         fetchModules();
         Swal.fire({
           icon: 'success',
-          title: '¡Módulo agregado!',
-          text: 'El contenido se ha añadido al curso correctamente.',
+          title: editingModuleId ? '¡Módulo actualizado!' : '¡Módulo agregado!',
+          text: editingModuleId ? 'El contenido se ha actualizado correctamente.' : 'El contenido se ha añadido al curso correctamente.',
           background: '#0f172a',
           color: '#f1f5f9',
           confirmButtonColor: '#8b5cf6',
           customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
         });
       } else {
-        throw new Error(data.error || 'Error al agregar el módulo');
+        throw new Error(data.error || 'Error al guardar el módulo');
       }
     } catch (error: any) {
       Swal.fire({
@@ -160,8 +265,10 @@ export default function CursoContenidoPage() {
           <div className="lg:col-span-1">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <FaPlus className="text-violet-400" /> Nuevo Módulo
+                {editingModuleId ? <FaEdit className="text-violet-400" /> : <FaPlus className="text-violet-400" />} 
+                {editingModuleId ? 'Editar Módulo' : 'Nuevo Módulo'}
               </h3>
+              
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Título *</label>
@@ -212,14 +319,29 @@ export default function CursoContenidoPage() {
                   />
                 </div>
 
-                <button 
-                  type="submit" 
-                  disabled={submitting} 
-                  className="w-full py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-lg hover:shadow-violet-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {submitting ? <FaSpinner className="animate-spin" /> : <FaPlus />}
-                  {submitting ? 'Guardando...' : 'Agregar Módulo'}
-                </button>
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    type="submit" 
+                    disabled={submitting} 
+                    className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-lg hover:shadow-violet-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {submitting ? <FaSpinner className="animate-spin" /> : (editingModuleId ? <FaEdit /> : <FaPlus />)}
+                    {submitting ? 'Guardando...' : (editingModuleId ? 'Actualizar Módulo' : 'Agregar Módulo')}
+                  </button>
+                  
+                  {editingModuleId && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setFormData({ title: '', description: '', content: '', type: 'texto' });
+                        setEditingModuleId(null);
+                      }}
+                      className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  )}
+                </div>
               </form>
             </div>
           </div>
@@ -234,11 +356,14 @@ export default function CursoContenidoPage() {
               </div>
             ) : (
               modules.map((module, index) => {
-                // ✅ AQUÍ ESTÁ LA MAGIA: Si 'type' no existe (undefined), asume por defecto que es 'texto'
                 const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
+                const safeKey = module._id || module.id || `order-${module.order}` || `module-${index}`;
 
                 return (
-                  <div key={index} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
+                  <div 
+                    key={safeKey} 
+                    className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}
+                  >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
                         <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
@@ -246,7 +371,9 @@ export default function CursoContenidoPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
+                            <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">
+                              Módulo {module.order || index + 1}
+                            </span>
                             <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">
                               {moduleType}
                             </span>
@@ -254,7 +381,7 @@ export default function CursoContenidoPage() {
                           <h4 className="text-white font-semibold mb-1">{module.title}</h4>
                           {module.description && <p className="text-sm text-slate-400 mb-2">{module.description}</p>}
                           
-                          {/* ✅ CONDICIÓN A PRUEBA DE FALLOS: Si es 'texto' (o no tiene tipo), muestra el texto. */}
+                          {/* ✅ AQUÍ ESTÁ LA MEJORA: Botón claro y clicable para URLs, PDFs y Videos */}
                           {moduleType === 'texto' ? (
                             <div className="mt-2 p-4 rounded-lg bg-slate-950/50 border border-slate-800">
                               <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
@@ -266,20 +393,31 @@ export default function CursoContenidoPage() {
                               href={formatUrl(module.content)} 
                               target="_blank" 
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 hover:underline mt-2 font-medium"
+                              className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300 transition-all text-sm font-semibold group/link"
                             >
-                              Abrir recurso externo <FaExternalLinkAlt className="w-3 h-3" />
+                              <FaExternalLinkAlt className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
+                              Abrir {moduleType === 'video' ? 'Video' : moduleType === 'pdf' ? 'Documento PDF' : 'Enlace Externo'}
                             </a>
                           )}
                         </div>
                       </div>
                       
-                      <button 
-                        className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar módulo"
-                      >
-                        <FaTrash />
-                      </button>
+                      <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => handleEdit(module)}
+                          className="p-2 rounded-lg text-slate-600 hover:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                          title="Editar módulo"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(module)}
+                          className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                          title="Eliminar módulo"
+                        >
+                          <FaTrash />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

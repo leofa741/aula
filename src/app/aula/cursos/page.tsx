@@ -228,7 +228,7 @@ export default function CursosPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto  px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-40 mb-8 gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center mt-40 sm:gap-4">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-3">
               <FaBookOpen className="text-violet-400" />

@@ -1,5 +1,7 @@
 'use client';
 
+
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white p-4 relative overflow-hidden">
@@ -40,6 +42,7 @@ export default function HomePage() {
             Volvemos pronto con una nueva experiencia.
           </p>
         </div>
+      
 
         {/* Badge de estado */}
         <div className="pt-4">
@@ -52,7 +55,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
+ 
       {/* Footer minimalista opcional */}
       <div className="absolute bottom-6 text-slate-600 text-xs tracking-wider uppercase">
         © {new Date().getFullYear()} · Próximamente

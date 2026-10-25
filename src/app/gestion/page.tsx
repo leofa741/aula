@@ -40,11 +40,10 @@ function ModuleCard({ title, description, icon, href, color, available }: Module
   return (
     <Link
       href={available ? href : '#'}
-      className={`group relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 ${
-        available
+      className={`group relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 ${available
           ? `${theme.bgCard} ${theme.border} hover:border-violet-500/50 hover:bg-slate-800/90 hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-900/20`
           : 'bg-slate-900/40 border-slate-800 opacity-60 cursor-not-allowed'
-      }`}
+        }`}
     >
       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
         {icon}
@@ -165,6 +164,15 @@ export default function PanelGestionPage() {
       roles: ["alumno"] // 👈 Principalmente para alumnos
     },
     {
+      title: "Ide y Compilador en la Nube",
+      description: "Escribe, compila y ejecuta código en múltiples lenguajes directamente desde tu navegador.",
+      icon: <FaBookOpen className="w-6 h-6" />,
+      href: "/aula/ide",
+      color: "from-blue-600 to-indigo-600",
+      available: true,
+      roles: ["alumno", "profesor", "admin", "superadmin"]
+    },
+    {
       title: "Tareas y Calificaciones",
       description: "Revisa entregas de alumnos, deja feedback y gestiona el libro de calificaciones.",
       icon: <FaClipboardCheck className="w-6 h-6" />,
@@ -213,8 +221,8 @@ export default function PanelGestionPage() {
               Hola, {session?.user?.name || 'Usuario'}
             </h1>
             <p className="text-slate-400 mt-2 max-w-xl">
-              {userRole === 'alumno' 
-                ? 'Selecciona un módulo para acceder a tus cursos y materiales de estudio.' 
+              {userRole === 'alumno'
+                ? 'Selecciona un módulo para acceder a tus cursos y materiales de estudio.'
                 : 'Selecciona un módulo para comenzar a gestionar el Aula Virtual.'}
             </p>
           </div>

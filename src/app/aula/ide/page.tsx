@@ -39,7 +39,7 @@ export default function IdePage() {
     }
 
     return null; // Evita renderizar nada mientras se verifica la sesión
-}
+
 
 
 

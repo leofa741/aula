@@ -1,8 +1,55 @@
+'use client'
+
 import Link from 'next/link';
+import { useEffect } from 'react';
+
+
 import { ArrowLeft, Code2, Terminal } from 'lucide-react';
 import CodePlayground from '@/app/components/code/CodePlayground';
+import {  useRouter } from 'next/router';
+import { useSession } from 'next-auth/react';
 
 export default function IdePage() {
+
+    const { data: session, status } = useSession();
+    const router = useRouter();
+
+
+    useEffect(() => {
+        if (status === 'unauthenticated') {
+            router.push('/login');
+        }
+    }, [status, router]);
+
+    if (status === 'loading') {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-zinc-100">
+                <Terminal className="w-12 h-12 animate-spin text-indigo-400" />
+                <span className="ml-4 text-lg font-medium">Cargando IDE...</span>
+            </div>
+        );
+    }
+
+    if (status === 'unauthenticated') {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-zinc-100">
+                <p className="text-lg font-medium">Redirigiendo al login...</p>
+            </div>
+        );
+    }
+
+    return null; // Evita renderizar nada mientras se verifica la sesión
+}
+
+
+
+
+
+
+
+
+
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 relative overflow-hidden flex flex-col">
       

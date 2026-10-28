@@ -411,8 +411,8 @@ export default function CursoContenidoPage() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-violet-500/10 via-fuchsia-500/10 to-cyan-500/10 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 mt-40 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center gap-4 mb-8">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex items-center gap-4 mt-40  mb-8">
           <button onClick={() => router.push('/aula/cursos')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
             <FaArrowLeft />
           </button>

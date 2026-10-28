@@ -6,9 +6,6 @@ import { authOptions } from '@/app/lib/auth';
 import Course from '@/app/models/Course';
 import StudentNote from '@/app/models/StudentNote';
 
-
-
-
 // ✅ POST: Agregar un módulo/contenido a un curso
 export async function POST(
   req: NextRequest,
@@ -38,10 +35,15 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { title, description, content, type } = body;
+    const { title, description, content, type, assignmentFileUrl } = body;
 
-    if (!title || !content) {
-      return NextResponse.json({ error: 'El título y el contenido son obligatorios' }, { status: 400 });
+    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad/pdf
+    if (!title) {
+      return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
+    }
+
+    if (!content && type !== 'actividad' && type !== 'pdf') {
+      return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
 
     // Calcular el siguiente orden (order)
@@ -49,12 +51,13 @@ export async function POST(
       ? Math.max(...course.modules.map((m: any) => m.order)) + 1 
       : 1;
 
-    // Agregar el nuevo módulo
+    // ✅ Agregar el nuevo módulo CON assignmentFileUrl
     course.modules.push({
       title,
       description: description || '',
-      content,
-      type: type || 'texto', // 'texto', 'video', 'pdf', 'enlace'
+      content: content || '',
+      type: type || 'texto',
+      assignmentFileUrl: assignmentFileUrl || '', // ✅ GUARDAR URL DEL ARCHIVO
       order: nextOrder
     });
 
@@ -72,9 +75,7 @@ export async function POST(
   }
 }
 
-
-
-// ✅ 2. REEMPLAZA TU MÉTODO GET POR ESTE:
+// ✅ GET: Obtener módulos del curso
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -83,7 +84,6 @@ export async function GET(
     await connectDB();
     const courseId = (await params).id;
     
-    // Obtenemos solo los módulos y el título para no cargar datos innecesarios
     const course = await Course.findById(courseId).select('modules title status');
     if (!course) {
       return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
@@ -91,16 +91,15 @@ export async function GET(
 
     const sortedModules = course.modules.sort((a: any, b: any) => a.order - b.order);
 
-    // ✅ 3. LÓGICA CLAVE: Buscar la nota del alumno actual
+    // Buscar la nota del alumno actual
     let studentNote = null;
     const session = await getServerSession(authOptions);
     
-    // Solo buscamos si hay un usuario logueado
     if (session?.user?.id) {
       const noteDoc = await StudentNote.findOne({ 
         courseId, 
         studentId: session.user.id,
-        isVisibleToStudent: true // 🔒 SEGURIDAD: Solo traemos la nota si el profesor la marcó como visible
+        isVisibleToStudent: true
       });
       
       if (noteDoc && noteDoc.note) {
@@ -108,12 +107,11 @@ export async function GET(
       }
     }
 
-    // ✅ 4. Enviamos todo junto al frontend
     return NextResponse.json({ 
       success: true, 
       modules: sortedModules, 
       courseTitle: course.title,
-      studentNote // <-- Aquí va la nota (o null si no tiene o no es visible)
+      studentNote
     }, { status: 200 });
 
   } catch (error: any) {
@@ -121,9 +119,6 @@ export async function GET(
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
-
-
-
 
 // ✅ PUT: Editar un módulo específico
 export async function PUT(
@@ -154,24 +149,34 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { title, description, content, type } = body;
+    const { title, description, content, type, assignmentFileUrl } = body;
 
-    if (!title || !content) {
-      return NextResponse.json({ error: 'El título y el contenido son obligatorios' }, { status: 400 });
+    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad/pdf
+    if (!title) {
+      return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
 
-    // Buscar el módulo específico dentro del array usando su _id
+    if (!content && type !== 'actividad' && type !== 'pdf') {
+      return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
+    }
+
+    // Buscar el módulo específico dentro del array
     const module = course.modules.id(moduleId);
 
     if (!module) {
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
 
-    // Actualizar los campos del módulo
+    // ✅ Actualizar los campos del módulo CON assignmentFileUrl
     module.title = title;
     module.description = description || '';
-    module.content = content;
+    module.content = content || '';
     module.type = type || 'texto';
+    
+    // ✅ SOLO actualizar assignmentFileUrl si se envió uno nuevo
+    if (assignmentFileUrl !== undefined) {
+      module.assignmentFileUrl = assignmentFileUrl;
+    }
 
     await course.save();
 
@@ -225,8 +230,7 @@ export async function DELETE(
     // Eliminar el subdocumento del array
     module.deleteOne();
 
-    // ✨ BONUS: Reordenar los módulos restantes para mantener la secuencia (1, 2, 3...)
-    // Esto evita que queden huecos en el orden si se borra un módulo del medio
+    // Reordenar los módulos restantes
     course.modules.forEach((m: any, index: number) => {
       m.order = index + 1;
     });

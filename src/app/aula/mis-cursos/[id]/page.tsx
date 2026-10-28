@@ -3,7 +3,8 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaDownload } from 'react-icons/fa';
+import Swal from 'sweetalert2';
 
 const theme = {
   bg: 'bg-slate-950',
@@ -19,17 +20,25 @@ interface Module {
   title: string;
   description: string;
   content: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad';
+  assignmentFileUrl?: string;
   order: number;
 }
 
-const formatUrl = (url: string) => {
+interface Submission {
+  _id: string;
+  studentId: string;
+  fileUrl: string;
+  fileName: string;
+  status: 'pendiente' | 'aprobado' | 'rechazado';
+  feedback?: string;
+  submittedAt: string;
+}
+
+// ✅ FUNCIÓN INFALIBLE: Usa tu propio servidor para forzar la descarga sin errores de Cloudinary
+const getProxyDownloadUrl = (url: string, filename: string) => {
   if (!url) return '#';
-  const trimmed = url.trim();
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-    return trimmed;
-  }
-  return `https://${trimmed}`;
+  return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
 };
 
 export default function StudentCourseDetailPage() {
@@ -42,6 +51,9 @@ export default function StudentCourseDetailPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [studentNote, setStudentNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  const [submissions, setSubmissions] = useState<Record<string, Submission | null>>({});
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
@@ -71,6 +83,31 @@ export default function StudentCourseDetailPage() {
     }
   }, [status, courseId]);
 
+  useEffect(() => {
+    if (status === 'authenticated' && courseId && modules.length > 0) {
+      const fetchAllSubmissions = async () => {
+        const newSubmissions: Record<string, Submission | null> = {};
+        for (const module of modules) {
+          const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
+          if (moduleType === 'actividad' || moduleType === 'pdf') {
+            const safeKey = module._id || module.id || `module-${module.order}`;
+            try {
+              const res = await fetch(`/api/courses/${courseId}/modules/${safeKey}/submissions`);
+              if (res.ok) {
+                const data = await res.json();
+                newSubmissions[safeKey] = data.submissions && data.submissions.length > 0 ? data.submissions[0] : null;
+              }
+            } catch (error) {
+              console.error('Error cargando entrega:', error);
+            }
+          }
+        }
+        setSubmissions(prev => ({ ...prev, ...newSubmissions }));
+      };
+      fetchAllSubmissions();
+    }
+  }, [status, courseId, modules]);
+
   const handleJoinLiveClass = () => {
     const roomName = `AulaVirtual-${courseTitle.replace(/\s+/g, '-')}-${courseId}`;
     const jitsiUrl = `https://meet.jit.si/${roomName}#config.startWithAudioMuted=true&config.startWithVideoMuted=true&userInfo.displayName=${encodeURIComponent(session?.user?.name || 'Estudiante')}`;
@@ -81,10 +118,53 @@ export default function StudentCourseDetailPage() {
     if (!type) return <FaFileAlt className="text-slate-400 text-xl" />;
     switch (type) {
       case 'video': return <FaPlayCircle className="text-red-500 text-xl" />;
-      case 'pdf': return <FaFilePdf className="text-rose-500 text-xl" />;
+      case 'pdf': 
+      case 'actividad': return <FaFilePdf className="text-rose-500 text-xl" />;
       case 'enlace': return <FaFileAlt className="text-blue-400 text-xl" />;
       default: return <FaFileAlt className="text-slate-400 text-xl" />;
     }
+  };
+
+  const handleStudentSubmit = async (moduleId: string) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.doc,.docx';
+    input.onchange = async (e: any) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      Swal.fire({ title: 'Subiendo archivo...', text: 'Por favor espera', allowOutsideClick: false, didOpen: () => Swal.showLoading(), background: '#0f172a', color: '#f1f5f9' });
+      setUploading(true);
+
+      try {
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+        
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
+        if (!uploadRes.ok) throw new Error('Error al subir tu entrega');
+        const { url: fileUrl, fileName } = await uploadRes.json();
+        
+        const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileUrl, fileName }),
+        });
+
+        if (res.ok) {
+          Swal.fire({ icon: 'success', title: '¡Entrega enviada!', text: 'El profesor ha sido notificado por correo.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#10b981' });
+          const newSubData = await res.json();
+          setSubmissions(prev => ({ ...prev, [moduleId]: newSubData.submission }));
+        } else {
+          const errData = await res.json();
+          throw new Error(errData.error || 'Error al registrar la entrega');
+        }
+      } catch (error: any) {
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
   };
 
   if (status === 'loading' || loading) {
@@ -103,7 +183,6 @@ export default function StudentCourseDetailPage() {
 
       <div className="relative z-10 max-w-6xl mx-auto mt-40 px-4 sm:px-6 lg:px-8 py-12">
 
-        {/* Header con botón de volver */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={() => router.push('/aula/mis-cursos')}
@@ -119,7 +198,6 @@ export default function StudentCourseDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          {/* Columna Izquierda: Info y Clase en Vivo */}
           <div className="lg:col-span-1 space-y-6">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
               <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -145,10 +223,8 @@ export default function StudentCourseDetailPage() {
             </div>
           </div>
 
-          {/* Columna Derecha: Nota del Profesor + Lista de Módulos */}
           <div className="lg:col-span-2 space-y-6">
             
-            {/* Renderizado de la Nota */}
             {studentNote && (
               <div className="relative p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 via-violet-500/5 to-slate-900/50 border border-amber-500/20 backdrop-blur-sm shadow-lg">
                 <div className="absolute -top-3.5 left-5 px-3 py-1.5 rounded-full bg-slate-950 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
@@ -182,10 +258,11 @@ export default function StudentCourseDetailPage() {
               <div className="space-y-4">
                 {modules.map((module, index) => {
                   const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
-                  const safeKey = module._id || module.id || `module-${index}`;
+                  const safeKey = module._id || module.id || `module-${module.order}`;
+                  const isUrlContent = module.content?.trim().startsWith('http://') || module.content?.trim().startsWith('https://');
                   
-                  // ✅ LÓGICA INTELIGENTE: Detecta si el contenido es una URL, incluso si el tipo es "texto"
-                  const isUrlContent = module.content.trim().startsWith('http://') || module.content.trim().startsWith('https://');
+                  const isAssignment = moduleType === 'actividad' || moduleType === 'pdf';
+                  const mySubmission = submissions[safeKey];
 
                   return (
                     <div key={safeKey} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-emerald-500/30 transition-colors group`}>
@@ -209,14 +286,67 @@ export default function StudentCourseDetailPage() {
                             <p className="text-sm text-slate-400 mb-3">{module.description}</p>
                           )}
 
-                          {/* ✅ RENDERIZADO INTELIGENTE: Si es texto PERO contiene una URL, lo muestra como botón clicable */}
-                          {moduleType === 'texto' && !isUrlContent ? (
+                          {isAssignment ? (
+                            <div className="mt-3 space-y-3">
+                              {/* ✅ BOTÓN DE DESCARGA DEL PROFESOR USANDO EL PROXY */}
+                              <a
+                                href={getProxyDownloadUrl(module.assignmentFileUrl || module.content, module.title + '.pdf')}
+                                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link"
+                              >
+                                <FaDownload className="w-4 h-4" />
+                                Descargar Material / Consigna
+                              </a>
+
+                              {mySubmission ? (
+                                <div className="p-4 rounded-lg bg-slate-950/50 border border-slate-800 space-y-3">
+                                  <div className="flex items-center gap-2 text-sm flex-wrap">
+                                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                      mySubmission.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 
+                                      mySubmission.status === 'rechazado' ? 'bg-rose-500/20 text-rose-400' : 
+                                      'bg-amber-500/20 text-amber-400'
+                                    }`}>
+                                      Estado: {mySubmission.status.toUpperCase()}
+                                    </span>
+                                    <span className="text-slate-500 text-xs">
+                                      Subido el: {new Date(mySubmission.submittedAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  
+                                  {mySubmission.feedback && (
+                                    <div className="p-3 rounded bg-violet-500/10 border border-violet-500/20">
+                                      <p className="text-xs text-violet-300 font-semibold mb-1 flex items-center gap-1">
+                                        <FaLightbulb className="w-3 h-3"/> Devolución del Profesor:
+                                      </p>
+                                      <p className="text-sm text-slate-300 italic">"{mySubmission.feedback}"</p>
+                                    </div>
+                                  )}
+                                  
+                                  {/* ✅ BOTÓN DE DESCARGA DE LA ENTREGA DEL ALUMNO USANDO EL PROXY */}
+                                  <a 
+                                    href={getProxyDownloadUrl(mySubmission.fileUrl, mySubmission.fileName)}
+                                    className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+                                  >
+                                    <FaFileAlt className="w-3 h-3"/> Descargar mi entrega: {mySubmission.fileName}
+                                  </a>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleStudentSubmit(safeKey)}
+                                  disabled={uploading}
+                                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 disabled:cursor-not-allowed text-white text-sm font-semibold transition-all"
+                                >
+                                  {uploading ? <FaSpinner className="animate-spin" /> : <FaFileAlt className="w-4 h-4" />}
+                                  {uploading ? 'Subiendo...' : 'Subir mi Entrega Resuelta'}
+                                </button>
+                              )}
+                            </div>
+                          ) : moduleType === 'texto' && !isUrlContent ? (
                             <div className="mt-3 p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
                               {module.content}
                             </div>
                           ) : (
                             <a
-                              href={formatUrl(module.content)}
+                              href={module.content}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300 transition-all text-sm font-semibold group/link"

@@ -139,6 +139,7 @@ export default function Navbar() {
   const image = session?.user?.image;
 
 
+
   // 🎨 Paleta Premium - Gradientes sofisticados
   const gradients = {
     primary: 'from-indigo-500 via-purple-500 to-pink-500',

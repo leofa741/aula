@@ -3,25 +3,26 @@ import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 
 // ─────────────────────────────────────────────────────────────
-// 🔹 TIPOS PARA EL FORMULARIO DE INDUMENTARIA (SG TU LOOK)
+// 🔹 TIPOS PARA EL FORMULARIO DE CONTACTO DEL AULA VIRTUAL
 // ─────────────────────────────────────────────────────────────
 interface ContactForm {
   name: string;
-  contact: string; // Puede ser email o teléfono
-  interest: 'general' | 'talle' | 'stock' | 'asesoramiento' | 'mayorista';
+  email: string;
+  role?: 'alumno' | 'profesor' | 'administrador';
+  subject: 'soporte' | 'curso' | 'entrega' | 'sugerencia' | 'otro';
+  courseName?: string; // Opcional: Nombre del curso o módulo relacionado
   message: string;
-  subject?: string;
 }
 
 // ─────────────────────────────────────────────────────────────
-// 🔹 MAPEOS LEGIBLES PARA EL EMAIL
+// 🔹 MAPEOS LEGIBLES PARA EL ASUNTO DEL EMAIL
 // ─────────────────────────────────────────────────────────────
-const interestLabels: Record<string, string> = {
-  general: 'Consulta general',
-  talle: 'Dudas sobre talles y medidas',
-  stock: 'Consultar stock de una prenda',
-  asesoramiento: 'Asesoramiento de imagen personalizado',
-  mayorista: 'Compras mayoristas',
+const subjectLabels: Record<string, string> = {
+  soporte: '🛠️ Soporte Técnico',
+  curso: '📚 Consulta sobre un Curso',
+  entrega: '📝 Problema con una Entrega/Tarea',
+  sugerencia: '💡 Sugerencia o Feedback',
+  otro: '📩 Consulta General',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -30,10 +31,10 @@ const interestLabels: Record<string, string> = {
 export async function POST(req: Request) {
   try {
     const body: ContactForm = await req.json();
-    const { name, contact, interest, message } = body;
+    const { name, email, role, subject, courseName, message } = body;
 
-    // ✅ Validación de campos obligatorios (ahora usa 'contact' en lugar de 'email')
-    if (!name?.trim() || !contact?.trim() || !message?.trim() || !interest) {
+    // ✅ Validación de campos obligatorios
+    if (!name?.trim() || !email?.trim() || !message?.trim() || !subject) {
       return NextResponse.json(
         { success: false, message: 'Por favor, completá los campos obligatorios.' },
         { status: 400 }
@@ -59,30 +60,30 @@ export async function POST(req: Request) {
     const emailContent = buildEmailContent(body);
 
     const mailOptions = {
-      from: `"SG Tu Look" <${process.env.MAILER_EMAIL}>`,
-      to: process.env.MAILER_EMAIL,
+      from: `"Aula Virtual" <${process.env.MAILER_EMAIL}>`,
+      to: process.env.MAILER_EMAIL, // El email del administrador/profesor principal
       cc: process.env.MAILER_CC ? process.env.MAILER_CC.split(',').map((e: string) => e.trim()) : undefined,
-      subject: `✨ Nueva consulta: ${interestLabels[interest]} - ${name}`,
+      subject: `🎓 ${subjectLabels[subject]} - ${name}`,
       html: emailContent,
       text: buildTextContent(body), // Fallback para clientes que no soportan HTML
     };
 
     await transporter.sendMail(mailOptions);
 
-    console.log(`✅ Email enviado: ${interest} - ${contact}`);
+    console.log(`✅ Email de contacto enviado: ${subject} - ${email}`);
 
     return NextResponse.json({ 
       success: true, 
-      message: '¡Mensaje enviado! Te responderemos a la brevedad.' 
+      message: '¡Mensaje enviado correctamente! Te responderemos a la brevedad.' 
     });
 
   } catch (error) {
-    console.error('❌ Error al enviar el correo:', error);
+    console.error('❌ Error al enviar el correo de contacto:', error);
     
     return NextResponse.json(
       { 
         success: false, 
-        message: 'Ocurrió un error al enviar tu consulta. Por favor, intentá de nuevo o contactanos por WhatsApp.' 
+        message: 'Ocurrió un error al enviar tu mensaje. Por favor, intentá de nuevo o contactanos por otro medio.' 
       },
       { status: 500 }
     );
@@ -90,26 +91,29 @@ export async function POST(req: Request) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 🔹 PLANTILLA HTML PREMIUM PARA EL EMAIL
+// 🔹 PLANTILLA HTML PREMIUM PARA EL EMAIL (Estilo Aula Virtual)
 // ─────────────────────────────────────────────────────────────
 function buildEmailContent(data: ContactForm): string {
-  const { name, contact, interest, message } = data;
+  const { name, email, role, subject, courseName, message } = data;
   
   const styles = {
-    container: 'font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0;',
-    header: 'background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%); padding: 32px 24px; text-align: center; border-radius: 12px 12px 0 0;',
+    container: 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f8fafc;',
+    header: 'background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 32px 24px; text-align: center; border-radius: 12px 12px 0 0;',
     headerTitle: 'color: white; font-size: 24px; font-weight: bold; margin: 0 0 8px 0;',
     headerSubtitle: 'color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;',
-    body: 'background: #fafafa; padding: 24px; border-radius: 0 0 12px 12px;',
-    card: 'background: white; padding: 20px; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);',
-    label: 'color: #71717a; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 4px 0;',
-    value: 'color: #18181b; font-size: 15px; font-weight: 500; margin: 0 0 12px 0;',
-    messageBox: 'background: #fdf2f8; padding: 16px; border-radius: 8px; border-left: 4px solid #f43f5e; margin: 16px 0;',
-    messageText: 'color: #3f3f46; font-size: 14px; line-height: 1.6; margin: 0; white-space: pre-wrap;',
-    footer: 'text-align: center; padding: 24px; color: #a1a1aa; font-size: 12px;',
-    badge: 'display: inline-block; background: linear-gradient(135deg, #f43f5e, #e11d48); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;',
-    divider: 'height: 1px; background: linear-gradient(to right, transparent, #e4e4e7, transparent); margin: 20px 0;',
+    body: 'background: #ffffff; padding: 32px 24px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none;',
+    card: 'background: #f8fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0;',
+    label: 'color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 6px 0; font-weight: 600;',
+    value: 'color: #0f172a; font-size: 15px; font-weight: 500; margin: 0 0 16px 0;',
+    messageBox: 'background: #eef2ff; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 16px 0;',
+    messageText: 'color: #1e293b; font-size: 14px; line-height: 1.6; margin: 0; white-space: pre-wrap;',
+    footer: 'text-align: center; padding: 24px; color: #94a3b8; font-size: 12px; margin-top: 16px;',
+    badge: 'display: inline-block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; padding: 6px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 24px;',
+    divider: 'height: 1px; background: linear-gradient(to right, transparent, #e2e8f0, transparent); margin: 24px 0;',
+    button: 'display: inline-block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 16px;',
   };
+
+  const roleDisplay = role ? ` (${role.charAt(0).toUpperCase() + role.slice(1)})` : '';
 
   return `
     <!DOCTYPE html>
@@ -117,51 +121,59 @@ function buildEmailContent(data: ContactForm): string {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Nueva consulta - SG Tu Look</title>
+      <title>Nuevo mensaje - Aula Virtual</title>
     </head>
-    <body style="${styles.container}">
+    <body style="background-color: #f1f5f9; margin: 0; padding: 20px;">
       
-      <div style="${styles.header}">
-        <h1 style="${styles.headerTitle}">✨ Nueva Consulta</h1>
-        <p style="${styles.headerSubtitle}">SG Tu Look</p>
-      </div>
-
-      <div style="${styles.body}">
+      <div style="${styles.container}">
         
-        <div style="text-align: center; margin-bottom: 24px;">
-          <span style="${styles.badge}">${interestLabels[interest] || interest}</span>
+        <div style="${styles.header}">
+          <h1 style="${styles.headerTitle}">🎓 Nuevo Mensaje de Contacto</h1>
+          <p style="${styles.headerSubtitle}">Plataforma de Aula Virtual</p>
         </div>
 
-        <div style="${styles.card}">
-          <p style="${styles.label}">Nombre completo</p>
-          <p style="${styles.value}">${name}</p>
+        <div style="${styles.body}">
           
-          <p style="${styles.label}">Email o Teléfono de contacto</p>
-          <p style="${styles.value}">${contact}</p>
-        </div>
-
-        <div style="${styles.card}">
-          <p style="${styles.label}">Mensaje</p>
-          <div style="${styles.messageBox}">
-            <p style="${styles.messageText}">${message.replace(/\n/g, '<br>')}</p>
+          <div style="text-align: center;">
+            <span style="${styles.badge}">${subjectLabels[subject] || subject}</span>
           </div>
+
+          <div style="${styles.card}">
+            <p style="${styles.label}">Nombre del usuario${roleDisplay}</p>
+            <p style="${styles.value}">${name}</p>
+            
+            <p style="${styles.label}">Correo electrónico de contacto</p>
+            <p style="${styles.value}">${email}</p>
+
+            ${courseName ? `
+            <p style="${styles.label}">Curso o Módulo relacionado</p>
+            <p style="${styles.value}">${courseName}</p>
+            ` : ''}
+          </div>
+
+          <div style="${styles.card}">
+            <p style="${styles.label}">Mensaje</p>
+            <div style="${styles.messageBox}">
+              <p style="${styles.messageText}">${message.replace(/\n/g, '<br>')}</p>
+            </div>
+          </div>
+
+          <div style="${styles.divider}"></div>
+
+          <div style="text-align: center;">
+            <a href="mailto:${email}?subject=Re: ${subjectLabels[subject]} - Aula Virtual" 
+               style="${styles.button}">
+              Responder a ${name}
+            </a>
+          </div>
+
         </div>
 
-        <div style="${styles.divider}"></div>
-
-        <div style="text-align: center; margin-top: 24px;">
-          <a href="mailto:${contact.includes('@') ? contact : ''}?subject=Re: Consulta SG Tu Look" 
-             style="display: inline-block; background: linear-gradient(135deg, #f43f5e, #e11d48); color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
-            Responder a ${name}
-          </a>
+        <div style="${styles.footer}">
+          <p style="margin: 0 0 8px 0;"><strong>Equipo de Soporte - Aula Virtual</strong></p>
+          <p style="margin: 0;">Este mensaje fue generado automáticamente desde el formulario de contacto de la plataforma.</p>
         </div>
 
-      </div>
-
-      <div style="${styles.footer}">
-        <p style="margin: 0 0 8px 0;"><strong>SG Tu Look</strong></p>
-        <p style="margin: 0 0 4px 0;">📧 ${process.env.MAILER_EMAIL}</p>
-        <p style="margin: 0;">Este mensaje fue enviado desde el formulario de contacto de <strong>SG Tu Look</strong>.</p>
       </div>
 
     </body>
@@ -173,23 +185,24 @@ function buildEmailContent(data: ContactForm): string {
 // 🔹 VERSIÓN TEXTO PLANO (FALLBACK)
 // ─────────────────────────────────────────────────────────────
 function buildTextContent(data: ContactForm): string {
-  const { name, contact, interest, message } = data;
+  const { name, email, role, subject, courseName, message } = data;
   
   return `
-NUEVA CONSULTA - SG TU LOOK
+NUEVO MENSAJE - AULA VIRTUAL
 ========================================================
 
-INTERÉS: ${interestLabels[interest] || interest}
+ASUNTO: ${subjectLabels[subject] || subject}
 
-CONTACTO:
-• Nombre: ${name}
-• Email/Teléfono: ${contact}
+USUARIO:
+• Nombre: ${name}${role ? ` (${role})` : ''}
+• Email: ${email}
+${courseName ? `• Curso/Módulo: ${courseName}` : ''}
 
 MENSAJE:
 ${message}
 
 ---
-Responder a: ${contact}
-Enviado desde: Formulario web SG Tu Look
+Responder a: ${email}
+Enviado desde: Formulario de contacto del Aula Virtual
   `.trim();
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import Link from 'next/link';
 
 // ─────────────────────────────────────────────────────────────
 // 🔹 Iconos Minimalistas
@@ -32,24 +31,39 @@ const Icons = {
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
     </svg>
+  ),
+  Book: () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    </svg>
   )
 };
 
 export default function Contact() {
-  // ✅ Estado del formulario
-  const [form, setForm] = useState({ name: '', contact: '', interest: 'general', message: '' });
-  // ✅ Nuevo estado para saber qué campos tocó el usuario (para mostrar bordes rojos)
-  const [touched, setTouched] = useState({ name: false, contact: false, message: false });
+  // ✅ Estado del formulario adaptado al Aula Virtual
+  const [form, setForm] = useState({ 
+    name: '', 
+    email: '', 
+    role: 'alumno', 
+    subject: 'soporte', 
+    courseName: '', 
+    message: '' 
+  });
+  
+  // ✅ Estado para validación visual de campos obligatorios
+  const [touched, setTouched] = useState({ name: false, email: false, message: false });
   const [status, setStatus] = useState<{ type: 'success' | 'error' | ''; message: string }>({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
 
-  const whatsappNumber = '5491132538837';
-  const whatsappMessage = 'Hola, me interesa consultar por una prenda de SG Tu Look';
+  const whatsappNumber = '5491132538837'; // Cambiar por el número real de soporte
+  const whatsappMessage = 'Hola, necesito soporte con el Aula Virtual.';
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
     setForm(prev => ({ ...prev, [id]: value }));
-    setTouched(prev => ({ ...prev, [id]: true })); // Marcar como "tocado" al escribir
+    if (id === 'name' || id === 'email' || id === 'message') {
+      setTouched(prev => ({ ...prev, [id]: true }));
+    }
     if (status.type === 'error') setStatus({ type: '', message: '' });
   }, [status.type]);
 
@@ -59,20 +73,16 @@ export default function Contact() {
     setLoading(true);
 
     // Forzar validación visual de todos los campos al intentar enviar
-    setTouched({ name: true, contact: true, message: true });
+    setTouched({ name: true, email: true, message: true });
 
-    // Protección contra undefined/null y limpieza de espacios
     const nameVal = (form.name || '').trim();
-    const contactVal = (form.contact || '').trim();
+    const emailVal = (form.email || '').trim();
     const messageVal = (form.message || '').trim();
 
-    // 🔍 DEBUG: Abrí la consola del navegador (F12) para ver qué está detectando React
-    console.log('🔍 Debug Validación:', { nameVal, contactVal, messageVal });
-
-    if (!nameVal || !contactVal || !messageVal) {
+    if (!nameVal || !emailVal || !messageVal) {
       setStatus({ 
         type: 'error', 
-        message: 'Por favor, completá los campos obligatorios (Nombre, Contacto y Mensaje).' 
+        message: 'Por favor, completá los campos obligatorios (Nombre, Email y Mensaje).' 
       });
       setLoading(false);
       return;
@@ -82,17 +92,14 @@ export default function Contact() {
       const res = await fetch('/api/send-mail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          ...form, 
-          subject: `Consulta Web - ${form.interest === 'general' ? 'General' : form.interest}` 
-        }),
+        body: JSON.stringify(form), // Enviamos el objeto form completo, que coincide con la API
       });
 
       const data = await res.json();
       if (data.success) {
-        setStatus({ type: 'success', message: '¡Mensaje enviado! Te responderemos a la brevedad.' });
-        setForm({ name: '', contact: '', interest: 'general', message: '' });
-        setTouched({ name: false, contact: false, message: false });
+        setStatus({ type: 'success', message: '¡Mensaje enviado correctamente! Te responderemos a la brevedad.' });
+        setForm({ name: '', email: '', role: 'alumno', subject: 'soporte', courseName: '', message: '' });
+        setTouched({ name: false, email: false, message: false });
       } else {
         setStatus({ type: 'error', message: data.message || 'Hubo un error. Inténtalo por WhatsApp.' });
       }
@@ -104,22 +111,22 @@ export default function Contact() {
   }, [form]);
 
   // Helper para clases dinámicas de los inputs
-  const getInputClass = (fieldName: 'name' | 'contact' | 'message') => {
+  const getInputClass = (fieldName: 'name' | 'email' | 'message') => {
     const isInvalid = touched[fieldName] && !(form[fieldName] || '').trim();
     return `w-full bg-transparent border-b py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none transition-colors duration-300 text-base ${
       isInvalid 
         ? 'border-red-500 focus:border-red-500' 
-        : 'border-zinc-800 focus:border-rose-400'
+        : 'border-zinc-800 focus:border-violet-500'
     }`;
   };
 
   return (
-    <div className="relative min-h-screen bg-zinc-950 text-zinc-100 selection:bg-rose-500/30">
+    <div className="relative min-h-screen bg-zinc-950 text-zinc-100 selection:bg-violet-500/30">
       
       {/* Fondo minimalista */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-rose-500/5 rounded-full blur-[120px]" />
-        <div className="absolute top-[40%] -left-[10%] w-[500px] h-[500px] bg-amber-500/5 rounded-full blur-[120px]" />
+        <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-violet-600/5 rounded-full blur-[120px]" />
+        <div className="absolute top-[40%] -left-[10%] w-[500px] h-[500px] bg-indigo-600/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-20">
@@ -127,11 +134,11 @@ export default function Contact() {
         {/* ───────── HEADER MINIMALISTA ───────── */}
         <div className="max-w-2xl mb-16 sm:mb-24">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-light tracking-tight text-white mb-6">
-            Hablemos de <span className="font-serif italic text-rose-300">tu estilo</span>.
+            Estamos aquí para <span className="font-serif italic text-violet-400">ayudarte</span>.
           </h1>
           <p className="text-lg text-zinc-400 font-light leading-relaxed max-w-xl">
-            ¿Tenés dudas sobre un talle, una prenda o querés asesoramiento personalizado? 
-            Estamos aquí para ayudarte a encontrar tu look perfecto.
+            ¿Tenés dudas sobre un curso, problemas con una entrega o necesitás soporte técnico? 
+            Nuestro equipo está listo para asistirte en tu camino de aprendizaje.
           </p>
         </div>
 
@@ -144,14 +151,14 @@ export default function Contact() {
                 href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-rose-500/30 transition-all duration-300"
+                className="group flex items-center gap-4 p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-violet-500/30 transition-all duration-300"
               >
                 <div className="w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                   <Icons.WhatsApp />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-white">WhatsApp</p>
-                  <p className="text-xs text-zinc-400 group-hover:text-emerald-400 transition-colors">Respuesta inmediata</p>
+                  <p className="text-sm font-medium text-white">Soporte por WhatsApp</p>
+                  <p className="text-xs text-zinc-400 group-hover:text-emerald-400 transition-colors">Respuesta rápida y directa</p>
                 </div>
                 <div className="ml-auto text-zinc-600 group-hover:text-white group-hover:translate-x-1 transition-all">
                   <Icons.ArrowRight />
@@ -164,9 +171,9 @@ export default function Contact() {
                     <Icons.Mail />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">Email</p>
-                    <a href="mailto:hola@sgtulook.com" className="text-sm text-zinc-400 hover:text-rose-300 transition-colors">
-                      hola@sgtulook.com
+                    <p className="text-sm font-medium text-zinc-200">Email de Soporte</p>
+                    <a href="mailto:soporte@aulavirtual.com" className="text-sm text-zinc-400 hover:text-violet-400 transition-colors">
+                      soporte@aulavirtual.com
                     </a>
                   </div>
                 </div>
@@ -176,8 +183,8 @@ export default function Contact() {
                     <Icons.MapPin />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">Showroom</p>
-                    <p className="text-sm text-zinc-400">Mendoza, Buenos Aires, Argentina</p>
+                    <p className="text-sm font-medium text-zinc-200">Modalidad</p>
+                    <p className="text-sm text-zinc-400">100% Online con Sede Central</p>
                   </div>
                 </div>
 
@@ -186,8 +193,8 @@ export default function Contact() {
                     <Icons.Clock />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-zinc-200">Horarios</p>
-                    <p className="text-sm text-zinc-400">Lunes a Sábados: 9:00 a 20:00 hs</p>
+                    <p className="text-sm font-medium text-zinc-200">Horarios de Atención</p>
+                    <p className="text-sm text-zinc-400">Lunes a Viernes: 8:00 a 20:00 hs</p>
                   </div>
                 </div>
               </div>
@@ -198,52 +205,83 @@ export default function Contact() {
           <div className="lg:col-span-8">
             <form onSubmit={handleSubmit} className="space-y-8">
               
-              {/* Fila 1: Nombre y Contacto */}
+              {/* Fila 1: Nombre y Email */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label htmlFor="name" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Nombre *</label>
+                  <label htmlFor="name" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Nombre completo *</label>
                   <input
                     type="text"
                     id="name"
                     value={form.name}
                     onChange={handleChange}
-                    placeholder="Tu nombre completo"
+                    placeholder="Tu nombre y apellido"
                     className={getInputClass('name')}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <label htmlFor="contact" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Email o Teléfono *</label>
+                  <label htmlFor="email" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Correo electrónico *</label>
                   <input
-                    type="text"
-                    id="contact"
-                    value={form.contact}
+                    type="email"
+                    id="email"
+                    value={form.email}
                     onChange={handleChange}
-                    placeholder="Para responderte"
-                    className={getInputClass('contact')}
+                    placeholder="tu@email.com"
+                    className={getInputClass('email')}
                     required
                   />
                 </div>
               </div>
 
-              {/* Fila 2: Interés */}
-              <div className="space-y-2">
-                <label htmlFor="interest" className="text-xs font-medium uppercase tracking-wider text-zinc-500">¿En qué podemos ayudarte?</label>
-                <select
-                  id="interest"
-                  value={form.interest}
-                  onChange={handleChange}
-                  className="w-full bg-transparent border-b border-zinc-800 py-3 text-zinc-100 focus:outline-none focus:border-rose-400 transition-colors duration-300 text-base appearance-none cursor-pointer"
-                >
-                  <option value="general" className="bg-zinc-900">Consulta general</option>
-                  <option value="talle" className="bg-zinc-900">Dudas sobre talles y medidas</option>
-                  <option value="stock" className="bg-zinc-900">Consultar stock de una prenda</option>
-                  <option value="asesoramiento" className="bg-zinc-900">Asesoramiento de imagen personalizado</option>
-                  <option value="mayorista" className="bg-zinc-900">Compras mayoristas</option>
-                </select>
+              {/* Fila 2: Rol y Asunto */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label htmlFor="role" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Tu rol</label>
+                  <select
+                    id="role"
+                    value={form.role}
+                    onChange={handleChange}
+                    className="w-full bg-transparent border-b border-zinc-800 py-3 text-zinc-100 focus:outline-none focus:border-violet-500 transition-colors duration-300 text-base appearance-none cursor-pointer"
+                  >
+                    <option value="alumno" className="bg-zinc-900">Alumno</option>
+                    <option value="profesor" className="bg-zinc-900">Profesor</option>
+                    <option value="administrador" className="bg-zinc-900">Administrador</option>
+                    <option value="otro" className="bg-zinc-900">Otro</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="subject" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Asunto *</label>
+                  <select
+                    id="subject"
+                    value={form.subject}
+                    onChange={handleChange}
+                    className="w-full bg-transparent border-b border-zinc-800 py-3 text-zinc-100 focus:outline-none focus:border-violet-500 transition-colors duration-300 text-base appearance-none cursor-pointer"
+                  >
+                    <option value="soporte" className="bg-zinc-900">🛠️ Soporte Técnico</option>
+                    <option value="curso" className="bg-zinc-900">📚 Consulta sobre un Curso</option>
+                    <option value="entrega" className="bg-zinc-900">📝 Problema con una Entrega</option>
+                    <option value="sugerencia" className="bg-zinc-900">💡 Sugerencia o Feedback</option>
+                    <option value="otro" className="bg-zinc-900">📩 Consulta General</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Fila 3: Mensaje */}
+              {/* Fila 3: Curso (Opcional) */}
+              <div className="space-y-2">
+                <label htmlFor="courseName" className="text-xs font-medium uppercase tracking-wider text-zinc-500 flex items-center gap-2">
+                  <Icons.Book /> Curso o Módulo relacionado <span className="text-zinc-600 font-normal normal-case">(Opcional)</span>
+                </label>
+                <input
+                  type="text"
+                  id="courseName"
+                  value={form.courseName}
+                  onChange={handleChange}
+                  placeholder="Ej: Introducción a la Programación"
+                  className="w-full bg-transparent border-b border-zinc-800 py-3 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors duration-300 text-base"
+                />
+              </div>
+
+              {/* Fila 4: Mensaje */}
               <div className="space-y-2">
                 <label htmlFor="message" className="text-xs font-medium uppercase tracking-wider text-zinc-500">Tu mensaje *</label>
                 <textarea
@@ -251,7 +289,7 @@ export default function Contact() {
                   rows={4}
                   value={form.message}
                   onChange={handleChange}
-                  placeholder="Contanos qué estás buscando, tu talle habitual o cualquier duda que tengas..."
+                  placeholder="Describí tu consulta, duda o problema con el mayor detalle posible..."
                   className={getInputClass('message')}
                   required
                 />
@@ -265,7 +303,7 @@ export default function Contact() {
                   className={`group relative w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full font-medium text-sm tracking-wide transition-all duration-300 min-h-[52px] ${
                     loading 
                       ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' 
-                      : 'bg-white text-zinc-950 hover:bg-rose-50 hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-violet-600 text-white hover:bg-violet-500 hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-violet-900/20'
                   }`}
                 >
                   {loading ? (
@@ -278,7 +316,7 @@ export default function Contact() {
                     </>
                   ) : (
                     <>
-                      <span>Enviar Consulta</span>
+                      <span>Enviar Mensaje</span>
                       <span className="group-hover:translate-x-1 transition-transform duration-300">
                         <Icons.ArrowRight />
                       </span>
@@ -299,7 +337,7 @@ export default function Contact() {
               )}
 
               <p className="text-xs text-zinc-600 pt-4">
-                Al enviar, aceptás nuestra política de privacidad. Tus datos están seguros con nosotros.
+                Al enviar, aceptás nuestra política de privacidad. Tus datos están seguros y solo serán utilizados para brindarte soporte.
               </p>
             </form>
           </div>

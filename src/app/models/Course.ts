@@ -3,7 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IModule {
   title: string;
   description: string;
-  content: string; // Puede ser texto, un enlace a video o instrucciones
+  content?: string; // Ahora opcional, una actividad puede solo tener archivo
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad';
+  assignmentFileUrl?: string; // URL del archivo de consigna subido por el profesor
   order: number;
 }
 
@@ -12,8 +14,8 @@ export interface ICourse extends Document {
   slug: string;
   description: string;
   image: string;
-  professor: mongoose.Types.ObjectId; // Referencia al User (rol: profesor o admin)
-  students: mongoose.Types.ObjectId[]; // Array de referencias a Users (rol: alumno)
+  professor: mongoose.Types.ObjectId;
+  students: mongoose.Types.ObjectId[];
   modules: IModule[];
   status: 'activo' | 'borrador' | 'finalizado';
   createdAt: Date;
@@ -23,9 +25,11 @@ export interface ICourse extends Document {
 const ModuleSchema = new Schema<IModule>({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  content: { type: String, required: true }, // Aquí irán los links a PDFs, videos, etc.
+  content: { type: String, default: '' }, // Cambiado a default ''
+  type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad'], default: 'texto' },
+  assignmentFileUrl: { type: String, default: '' },
   order: { type: Number, required: true }
-}, { _id: false }); // _id: false para no generar IDs innecesarios en subdocumentos
+}, { _id: false }); // Mantenemos _id: false para compatibilidad con tu BD actual
 
 const CourseSchema = new Schema<ICourse>(
   {
@@ -33,27 +37,18 @@ const CourseSchema = new Schema<ICourse>(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     description: { type: String, required: true },
     image: { type: String, default: 'https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=800&q=80' },
-    
-    // ✅ Relaciones con el modelo User
     professor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    students: [{ type: Schema.Types.ObjectId, ref: 'User' }], // MVP: Array directo. Escalable a 100-500 alumnos por curso.
-    
-    // ✅ Contenido del curso
+    students: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     modules: [ModuleSchema],
-    
-    // ✅ Estado del curso
     status: { 
       type: String, 
       enum: ['activo', 'borrador', 'finalizado'], 
       default: 'borrador' 
     }
   },
-  { 
-    timestamps: true // Agrega createdAt y updatedAt automáticamente
-  }
+  { timestamps: true }
 );
 
-// Generar slug automático antes de guardar si no se proporciona
 CourseSchema.pre('save', function (next) {
   if (this.isModified('title') && !this.isModified('slug')) {
     this.slug = this.title
@@ -65,5 +60,4 @@ CourseSchema.pre('save', function (next) {
 });
 
 const Course = mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
-
 export default Course;

@@ -76,6 +76,7 @@ export default function CursoContenidoPage() {
   const [submitting, setSubmitting] = useState(false);
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
 
+  // ✅ Ahora la clave es el ID del módulo (string), no el orden (number)
   const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
@@ -131,16 +132,16 @@ export default function CursoContenidoPage() {
     if (status === 'authenticated' && courseId && isAuthorized) fetchModules();
   }, [status, courseId, isAuthorized]);
 
-  const fetchSubmissions = async (moduleOrder: number, forceRefresh = false) => {
-    const submissionModuleId = `module-${moduleOrder}`;
-    if (!forceRefresh && submissions[submissionModuleId]) return;
+  // ✅ CORREGIDO: Ahora usa el ID único del módulo (string)
+  const fetchSubmissions = async (moduleId: string, forceRefresh = false) => {
+    if (!forceRefresh && submissions[moduleId]) return;
     
     setLoadingSubmissions(true);
     try {
-      const res = await fetch(`/api/courses/${courseId}/modules/${submissionModuleId}/submissions`);
+      const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions`);
       if (res.ok) {
         const data = await res.json();
-        setSubmissions(prev => ({ ...prev, [submissionModuleId]: data.submissions }));
+        setSubmissions(prev => ({ ...prev, [moduleId]: data.submissions }));
       }
     } catch (error) {
       console.error('Error cargando entregas:', error);
@@ -149,10 +150,10 @@ export default function CursoContenidoPage() {
     }
   };
 
-  const handleGradeSubmission = async (moduleOrder: number, submissionId: string, statusGrade: 'aprobado' | 'rechazado', feedback: string) => {
-    const submissionModuleId = `module-${moduleOrder}`;
+  // ✅ CORREGIDO: Ahora usa el ID único del módulo (string)
+  const handleGradeSubmission = async (moduleId: string, submissionId: string, statusGrade: 'aprobado' | 'rechazado', feedback: string) => {
     try {
-      const res = await fetch(`/api/courses/${courseId}/modules/${submissionModuleId}/submissions/${submissionId}`, {
+      const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions/${submissionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: statusGrade, feedback }),
@@ -165,7 +166,7 @@ export default function CursoContenidoPage() {
           text: `El alumno ha sido marcado como ${statusGrade}.`, 
           background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' 
         });
-        fetchSubmissions(moduleOrder, true); 
+        fetchSubmissions(moduleId, true); 
       } else {
         const errData = await res.json();
         throw new Error(errData.error || 'Error al guardar');
@@ -412,7 +413,9 @@ export default function CursoContenidoPage() {
               modules.map((module, index) => {
                 const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
                 const safeKey = module._id || module.id || `order-${module.order}` || `module-${index}`;
-                const submissionModuleId = `module-${module.order}`;
+                
+                // ✅ CLAVE CORREGIDA: Usamos el ID real del módulo para vincular las entregas de forma única
+                const submissionModuleId = String(module._id || module.id || `module-${module.order}`);
                 const moduleSubmissions = submissions[submissionModuleId] || [];
 
                 return (
@@ -455,10 +458,10 @@ export default function CursoContenidoPage() {
                                 </a>
                               )}
 
-                              {/* ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: Ahora incluye 'comprimido' para mostrar las entregas */}
                               {(moduleType === 'actividad' || moduleType === 'comprimido') && isProfessor && (
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                  <button onClick={() => fetchSubmissions(module.order)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
+                                  {/* ✅ CORREGIDO: Pasa el ID único del módulo, no el orden */}
+                                  <button onClick={() => fetchSubmissions(submissionModuleId)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
                                     <FaSpinner className={`w-3 h-3 ${loadingSubmissions ? 'animate-spin' : ''}`} /> 
                                     {loadingSubmissions ? 'Cargando entregas...' : `📥 Ver entregas de alumnos y Corregir (${moduleSubmissions.length})`}
                                   </button>
@@ -489,7 +492,9 @@ export default function CursoContenidoPage() {
                                             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
                                             const status = submitter?.value === 'aprobado' ? 'aprobado' : 'rechazado';
                                             const feedback = (formData.get('feedback') as string) || '';
-                                            handleGradeSubmission(module.order, sub._id, status, feedback);
+                                            
+                                            // ✅ CORREGIDO: Pasa el ID único del módulo
+                                            handleGradeSubmission(submissionModuleId, sub._id, status, feedback);
                                           }} className="space-y-2">
                                             <textarea name="feedback" defaultValue={sub.feedback || ''} placeholder="Escribe tu devolución o calificación..." className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" rows={2} />
                                             <div className="flex gap-2">

@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaFileWord, FaCheckCircle, FaTimesCircle, FaDownload } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaFileWord, FaCheckCircle, FaTimesCircle, FaDownload, FaFileArchive } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -20,7 +20,7 @@ interface Module {
   title: string;
   description: string;
   content: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
   assignmentFileUrl?: string;
   order: number;
 }
@@ -57,7 +57,6 @@ export default function CursoContenidoPage() {
   const params = useParams();
   const courseId = params.id as string;
 
-  // ✅ 1. TODOS LOS useState VAN AL PRINCIPIO, ANTES DE CUALQUIER RETURN
   const [mounted, setMounted] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<string>('alumno');
@@ -70,7 +69,7 @@ export default function CursoContenidoPage() {
     title: '',
     description: '',
     content: '',
-    type: 'texto' as 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad',
+    type: 'texto' as 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido',
   });
   
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
@@ -80,19 +79,12 @@ export default function CursoContenidoPage() {
   const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
-  // ✅ 2. TODOS LOS useEffect VAN DESPUÉS DE LOS useState
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    if (status === 'loading' || !mounted) {
-      console.log('⏳ Cargando sesión o componente...');
-      return;
-    }
-
-    // 🔍 ESTE CONSOLE.LOG ES CLAVE: Nos dirá qué tiene realmente tu sesión
-    console.log('🔍 DATOS REALES DE LA SESIÓN NEXTAUTH:', session);
+    if (status === 'loading' || !mounted) return;
 
     if (status === 'unauthenticated') {
       router.push('/login');
@@ -100,13 +92,9 @@ export default function CursoContenidoPage() {
     }
 
     let role = 'alumno'; 
-
-    // 1. Intentamos obtenerlo de la sesión de NextAuth
     if (session?.user?.role) {
       role = session.user.role;
-    } 
-    // 2. Si no está, intentamos obtenerlo del token en localStorage
-    else {
+    } else {
       const token = localStorage.getItem('token');
       if (token) {
         try {
@@ -118,12 +106,10 @@ export default function CursoContenidoPage() {
       }
     }
 
-    console.log('✅ ROL DETECTADO FINAL:', role);
     setUserRole(role);
     setIsAuthorized(true);
   }, [status, session, router, mounted]);
 
-  // ✅ 3. Funciones auxiliares
   const fetchModules = async () => {
     try {
       const res = await fetch(`/api/courses/${courseId}/modules`);
@@ -144,10 +130,9 @@ export default function CursoContenidoPage() {
   useEffect(() => {
     if (status === 'authenticated' && courseId && isAuthorized) fetchModules();
   }, [status, courseId, isAuthorized]);
+
   const fetchSubmissions = async (moduleOrder: number, forceRefresh = false) => {
     const submissionModuleId = `module-${moduleOrder}`;
-    
-    // ✅ Si NO es forzado y ya tenemos los datos, usamos el caché (para no saturar)
     if (!forceRefresh && submissions[submissionModuleId]) return;
     
     setLoadingSubmissions(true);
@@ -180,10 +165,7 @@ export default function CursoContenidoPage() {
           text: `El alumno ha sido marcado como ${statusGrade}.`, 
           background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' 
         });
-        
-        // ✅ AQUÍ ESTÁ LA MAGIA: El 'true' obliga a recargar los datos frescos del servidor
         fetchSubmissions(moduleOrder, true); 
-        
       } else {
         const errData = await res.json();
         throw new Error(errData.error || 'Error al guardar');
@@ -196,15 +178,7 @@ export default function CursoContenidoPage() {
   const handleEdit = (module: Module) => {
     const moduleId = module._id || module.id || (module.order ? module.order.toString() : null);
     if (!moduleId) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error de datos',
-        text: 'Este módulo no tiene un identificador válido para ser editado.',
-        background: '#0f172a',
-        color: '#f1f5f9',
-        confirmButtonColor: '#ef4444',
-        customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
-      });
+      Swal.fire({ icon: 'error', title: 'Error de datos', text: 'Este módulo no tiene un identificador válido para ser editado.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
       return;
     }
 
@@ -222,15 +196,7 @@ export default function CursoContenidoPage() {
   const handleDelete = async (module: Module) => {
     const moduleId = module._id || module.id || (module.order ? module.order.toString() : null);
     if (!moduleId) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo identificar el módulo para eliminar.',
-        background: '#0f172a',
-        color: '#f1f5f9',
-        confirmButtonColor: '#ef4444',
-        customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
-      });
+      Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo identificar el módulo para eliminar.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
       return;
     }
 
@@ -243,9 +209,7 @@ export default function CursoContenidoPage() {
       cancelButtonColor: '#64748b',
       confirmButtonText: 'Sí, eliminar',
       cancelButtonText: 'Cancelar',
-      background: '#0f172a',
-      color: '#f1f5f9',
-      customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+      background: '#0f172a', color: '#f1f5f9'
     });
 
     if (result.isConfirmed) {
@@ -258,32 +222,16 @@ export default function CursoContenidoPage() {
             setEditingModuleId(null);
           }
           fetchModules();
-          Swal.fire({
-            icon: 'success',
-            title: 'Eliminado',
-            text: 'El módulo ha sido eliminado correctamente.',
-            background: '#0f172a',
-            color: '#f1f5f9',
-            confirmButtonColor: '#8b5cf6',
-            customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
-          });
+          Swal.fire({ icon: 'success', title: 'Eliminado', text: 'El módulo ha sido eliminado correctamente.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
         } else {
-          const data = await res.json();
-          throw new Error(data.error || 'Error al eliminar el módulo');
+          throw new Error('Error al eliminar el módulo');
         }
       } catch (error: any) {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: error.message,
-          background: '#0f172a',
-          color: '#f1f5f9',
-          confirmButtonColor: '#ef4444',
-          customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
-        });
+        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
       }
     }
   };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -292,29 +240,18 @@ export default function CursoContenidoPage() {
       let finalContent = formData.content;
       let assignmentFileUrl = '';
 
-      console.log('🔍 DEBUG: Tipo seleccionado:', formData.type);
-      console.log('🔍 DEBUG: Archivo a subir:', fileToUpload);
-
-      // 1. Validación: Si es actividad o pdf, debe haber un archivo (si es nuevo)
-      if ((formData.type === 'actividad' || formData.type === 'pdf') && !editingModuleId && !fileToUpload) {
-        throw new Error('Debes seleccionar un archivo PDF o DOC para este tipo de módulo.');
+      if ((formData.type === 'actividad' || formData.type === 'pdf' || formData.type === 'comprimido') && !editingModuleId && !fileToUpload) {
+        throw new Error('Debes seleccionar un archivo para este tipo de módulo.');
       }
 
-      // 2. Subida del archivo si existe
-      if ((formData.type === 'pdf' || formData.type === 'actividad') && fileToUpload) {
+      if ((formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') && fileToUpload) {
         const formDataUpload = new FormData();
         formDataUpload.append('file', fileToUpload);
         
-        console.log('⏳ Subiendo archivo a Cloudinary...');
         const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
-        
-        if (!uploadRes.ok) {
-          const errText = await uploadRes.text();
-          throw new Error(`Error al subir el archivo: ${errText}`);
-        }
+        if (!uploadRes.ok) throw new Error('Error al subir el archivo');
         
         const uploadData = await uploadRes.json();
-        console.log('✅ Archivo subido. URL:', uploadData.url);
 
         if (formData.type === 'actividad') {
           assignmentFileUrl = uploadData.url;
@@ -323,29 +260,17 @@ export default function CursoContenidoPage() {
         }
       }
 
-      // 3. Parche para que el backend no rechace el "content" vacío en actividades
       if (!finalContent || finalContent.trim() === '') {
-        finalContent = 'Archivo adjunto a la actividad';
+        finalContent = 'Archivo adjunto al módulo';
       }
 
-      const url = editingModuleId 
-        ? `/api/courses/${courseId}/modules/${editingModuleId}` 
-        : `/api/courses/${courseId}/modules`;
-      
+      const url = editingModuleId ? `/api/courses/${courseId}/modules/${editingModuleId}` : `/api/courses/${courseId}/modules`;
       const method = editingModuleId ? 'PUT' : 'POST';
-
-      const payload = { 
-        ...formData, 
-        content: finalContent, 
-        assignmentFileUrl // <-- ESTO ES LO QUE EL BACKEND DEBE RECIBIR
-      };
-      
-      console.log('📦 Enviando al backend:', payload);
 
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...formData, content: finalContent, assignmentFileUrl }),
       });
 
       const data = await res.json();
@@ -355,23 +280,12 @@ export default function CursoContenidoPage() {
         setFileToUpload(null);
         setEditingModuleId(null);
         fetchModules();
-        Swal.fire({
-          icon: 'success',
-          title: editingModuleId ? '¡Módulo actualizado!' : '¡Módulo agregado!',
-          text: 'El contenido se ha guardado correctamente.',
-          background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6'
-        });
+        Swal.fire({ icon: 'success', title: editingModuleId ? '¡Módulo actualizado!' : '¡Módulo agregado!', text: 'El contenido se ha guardado correctamente.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
       } else {
         throw new Error(data.error || 'Error al guardar el módulo');
       }
     } catch (error: any) {
-      console.error('❌ ERROR EN handleSubmit:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: error.message,
-        background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444'
-      });
+      Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
     } finally {
       setSubmitting(false);
     }
@@ -384,6 +298,7 @@ export default function CursoContenidoPage() {
       case 'pdf': return <FaFilePdf className="text-rose-500" />;
       case 'enlace': return <FaFileAlt className="text-blue-400" />;
       case 'actividad': return <FaFileWord className="text-blue-500" />;
+      case 'comprimido': return <FaFileArchive className="text-yellow-500" />;
       default: return <FaFileAlt className="text-slate-400" />;
     }
   };
@@ -391,9 +306,6 @@ export default function CursoContenidoPage() {
   const allowedProfessorRoles = ['superadmin', 'admin', 'profesor', 'professor'];
   const isProfessor = allowedProfessorRoles.includes(userRole);
 
-  console.log('Mounted:', mounted, 'Status:', status, 'IsAuthorized:', isAuthorized, 'UserRole:', userRole, 'IsProfessor:', isProfessor);
-
-  // ✅ 4. LOS RETURNS CONDICIONALES VAN AL FINAL, DESPUÉS DE TODOS LOS HOOKS
   if (status === 'loading' || isAuthorized === null || !mounted || loading) {
     return (
       <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
@@ -404,7 +316,6 @@ export default function CursoContenidoPage() {
 
   if (!isAuthorized) return null;
 
-  // ✅ 5. RENDERIZADO JSX
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -412,7 +323,7 @@ export default function CursoContenidoPage() {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center gap-4 mt-40  mb-8">
+        <div className="flex items-center gap-4 mt-40 mb-8">
           <button onClick={() => router.push('/aula/cursos')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
             <FaArrowLeft />
           </button>
@@ -443,6 +354,7 @@ export default function CursoContenidoPage() {
                       <option value="texto">📝 Texto / Instrucciones</option>
                       <option value="video">🎥 Enlace de Video (YouTube/Vimeo)</option>
                       <option value="pdf">📄 Subir Archivo PDF</option>
+                      <option value="comprimido">📦 Archivo Comprimido (ZIP/RAR)</option>
                       <option value="enlace">🔗 Enlace Externo</option>
                       <option value="actividad">📚 Actividad / Entrega (Requiere tarea del alumno)</option>
                     </select>
@@ -450,11 +362,17 @@ export default function CursoContenidoPage() {
 
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
-                      {formData.type === 'texto' ? 'Contenido (Texto)' : (formData.type === 'pdf' || formData.type === 'actividad') ? 'Archivo PDF/DOC *' : 'URL del Contenido *'}
+                      {formData.type === 'texto' ? 'Contenido (Texto)' : (formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') ? 'Archivo *' : 'URL del Contenido *'}
                     </label>
                     
-                    {(formData.type === 'pdf' || formData.type === 'actividad') ? (
-                      <input type="file" accept=".pdf,.doc,.docx" onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} required={!editingModuleId} className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500" />
+                    {(formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') ? (
+                      <input 
+                        type="file" 
+                        accept=".pdf,.doc,.docx,.zip,.rar,.7z"
+                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)} 
+                        required={!editingModuleId} 
+                        className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500" 
+                      />
                     ) : (
                       <textarea value={formData.content} onChange={(e) => setFormData({...formData, content: e.target.value})} required rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm resize-none" placeholder={formData.type === 'texto' ? 'Escribe las instrucciones o el contenido aquí...' : 'Ej: https://youtube.com/watch?v=...'} />
                     )}
@@ -523,21 +441,22 @@ export default function CursoContenidoPage() {
                             </a>
                           ) : null}
 
-                          {(moduleType === 'actividad' || moduleType === 'pdf') && (
+                          {(moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido') && (
                             <div className="mt-4 space-y-4">
-                              {moduleType === 'pdf' && !module.assignmentFileUrl && (
-                                <a href={formatUrl(module.content)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all text-sm font-semibold">
-                                  <FaExternalLinkAlt className="w-4 h-4" /> Abrir Documento PDF
+                              {(moduleType === 'pdf' || moduleType === 'comprimido') && !module.assignmentFileUrl && (
+                                <a href={getProxyDownloadUrl(module.content, module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf'))} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all text-sm font-semibold">
+                                  <FaDownload className="w-4 h-4" /> Descargar Archivo
                                 </a>
                               )}
 
                               {module.assignmentFileUrl && (
-                                <a href={getProxyDownloadUrl(module.assignmentFileUrl, module.title + '.pdf')} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold">
-                                  <FaDownload className="w-4 h-4" /> Descargar Consigna del Profesor
+                                <a href={getProxyDownloadUrl(module.assignmentFileUrl, module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf'))} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold">
+                                  <FaDownload className="w-4 h-4" /> Descargar Consigna / Archivo
                                 </a>
                               )}
 
-                              {isProfessor && (
+                              {/* ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: Ahora incluye 'comprimido' para mostrar las entregas */}
+                              {(moduleType === 'actividad' || moduleType === 'comprimido') && isProfessor && (
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                                   <button onClick={() => fetchSubmissions(module.order)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
                                     <FaSpinner className={`w-3 h-3 ${loadingSubmissions ? 'animate-spin' : ''}`} /> 
@@ -567,20 +486,12 @@ export default function CursoContenidoPage() {
                                             e.preventDefault();
                                             const form = e.currentTarget;
                                             const formData = new FormData(form);
-                                            
                                             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
                                             const status = submitter?.value === 'aprobado' ? 'aprobado' : 'rechazado';
                                             const feedback = (formData.get('feedback') as string) || '';
-
                                             handleGradeSubmission(module.order, sub._id, status, feedback);
                                           }} className="space-y-2">
-                                            <textarea 
-                                              name="feedback" 
-                                              defaultValue={sub.feedback || ''} 
-                                              placeholder="Escribe tu devolución o calificación..." 
-                                              className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" 
-                                              rows={2} 
-                                            />
+                                            <textarea name="feedback" defaultValue={sub.feedback || ''} placeholder="Escribe tu devolución o calificación..." className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" rows={2} />
                                             <div className="flex gap-2">
                                               <button type="submit" name="status" value="aprobado" className="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1">
                                                 <FaCheckCircle className="w-3 h-3"/> Aprobar

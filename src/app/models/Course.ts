@@ -4,7 +4,7 @@ export interface IModule {
   title: string;
   description: string;
   content?: string; // Ahora opcional, una actividad puede solo tener archivo
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido'; // Agregado 'comprimido' como tipo válido
   assignmentFileUrl?: string; // URL del archivo de consigna subido por el profesor
   order: number;
 }
@@ -26,7 +26,7 @@ const ModuleSchema = new Schema<IModule>({
   title: { type: String, required: true },
   description: { type: String, default: '' },
   content: { type: String, default: '' }, // Cambiado a default ''
-  type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad'], default: 'texto' },
+  type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad', 'comprimido'], default: 'texto' },
   assignmentFileUrl: { type: String, default: '' },
   order: { type: Number, required: true }
 }, { _id: false }); // Mantenemos _id: false para compatibilidad con tu BD actual

@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaDownload } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaDownload, FaFileArchive } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -20,7 +20,7 @@ interface Module {
   title: string;
   description: string;
   content: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad';
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido'; // ✅ Agregado 'comprimido'
   assignmentFileUrl?: string;
   order: number;
 }
@@ -89,7 +89,8 @@ export default function StudentCourseDetailPage() {
         const newSubmissions: Record<string, Submission | null> = {};
         for (const module of modules) {
           const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
-          if (moduleType === 'actividad' || moduleType === 'pdf') {
+          // ✅ Agregado 'comprimido' a la lista de tipos que requieren entrega
+          if (moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido') {
             const safeKey = module._id || module.id || `module-${module.order}`;
             try {
               const res = await fetch(`/api/courses/${courseId}/modules/${safeKey}/submissions`);
@@ -114,12 +115,14 @@ export default function StudentCourseDetailPage() {
     window.open(jitsiUrl, '_blank');
   };
 
+  // ✅ Icono actualizado para archivos comprimidos
   const getModuleIcon = (type: string | undefined) => {
     if (!type) return <FaFileAlt className="text-slate-400 text-xl" />;
     switch (type) {
       case 'video': return <FaPlayCircle className="text-red-500 text-xl" />;
       case 'pdf': 
       case 'actividad': return <FaFilePdf className="text-rose-500 text-xl" />;
+      case 'comprimido': return <FaFileArchive className="text-yellow-500 text-xl" />; // ✅ Nuevo icono
       case 'enlace': return <FaFileAlt className="text-blue-400 text-xl" />;
       default: return <FaFileAlt className="text-slate-400 text-xl" />;
     }
@@ -128,7 +131,8 @@ export default function StudentCourseDetailPage() {
   const handleStudentSubmit = async (moduleId: string) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.pdf,.doc,.docx';
+    // ✅ Ahora acepta archivos comprimidos para la entrega del alumno
+    input.accept = '.pdf,.doc,.docx,.zip,.rar,.7z';
     input.onchange = async (e: any) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -261,7 +265,8 @@ export default function StudentCourseDetailPage() {
                   const safeKey = module._id || module.id || `module-${module.order}`;
                   const isUrlContent = module.content?.trim().startsWith('http://') || module.content?.trim().startsWith('https://');
                   
-                  const isAssignment = moduleType === 'actividad' || moduleType === 'pdf';
+                  // ✅ Agregado 'comprimido' para que active la lógica de descarga y entrega
+                  const isAssignment = moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido';
                   const mySubmission = submissions[safeKey];
 
                   return (
@@ -288,13 +293,16 @@ export default function StudentCourseDetailPage() {
 
                           {isAssignment ? (
                             <div className="mt-3 space-y-3">
-                              {/* ✅ BOTÓN DE DESCARGA DEL PROFESOR USANDO EL PROXY */}
+                              {/* ✅ BOTÓN DE DESCARGA INTELIGENTE (Detecta si es comprimido para el nombre y texto) */}
                               <a
-                                href={getProxyDownloadUrl(module.assignmentFileUrl || module.content, module.title + '.pdf')}
+                                href={getProxyDownloadUrl(
+                                  module.assignmentFileUrl || module.content, 
+                                  module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf')
+                                )}
                                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link"
                               >
                                 <FaDownload className="w-4 h-4" />
-                                Descargar Material / Consigna
+                                {moduleType === 'comprimido' ? 'Descargar Archivo Comprimido' : 'Descargar Material / Consigna'}
                               </a>
 
                               {mySubmission ? (
@@ -321,7 +329,7 @@ export default function StudentCourseDetailPage() {
                                     </div>
                                   )}
                                   
-                                  {/* ✅ BOTÓN DE DESCARGA DE LA ENTREGA DEL ALUMNO USANDO EL PROXY */}
+                                  {/* ✅ BOTÓN DE DESCARGA DE LA ENTREGA DEL ALUMNO */}
                                   <a 
                                     href={getProxyDownloadUrl(mySubmission.fileUrl, mySubmission.fileName)}
                                     className="text-xs text-blue-400 hover:underline flex items-center gap-1"

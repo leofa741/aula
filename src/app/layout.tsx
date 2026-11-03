@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Montserrat } from "next/font/google";
 
 
-
+// @ts-ignore: Next.js handles this CSS side-effect import during compilation.
 import "./globals.css";
 import Navbar from "./components/navbar/Navbar";
 import Footer from "./components/footer/Footer";
@@ -35,56 +35,12 @@ const montserrat = Montserrat({
   weight: ["400"],
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.sgtulook.com.ar';
-
 
 
 export const metadata: Metadata = {
   title: "Aula virtual",
-  description: "Encontrá lo que buscás en Aula virtual",
-  manifest: "/manifest.json",
-  keywords: "moda , ropa de mujer, look, tendencia, outfit, moda 2026",
-  authors: [{ name: "Aula virtual", url: SITE_URL }],
-
-  metadataBase: new URL(SITE_URL),
-  alternates: {
-    canonical: '/',
-  },
-
-
-  openGraph: {
-    title: "Aula virtual",
-    description: "Encontrá lo que buscás en Aula virtual",
-    url: SITE_URL,
-    siteName: "Aula virtual",
-    images: [
-      {
-        url: "/og-image.jpg",
-        width: 1200,
-        height: 630,
-        alt: "Aula virtual",
-      },
-    ],
-    locale: "es_AR",
-    type: "website",
-  },
-
-  twitter: {
-    card: "summary_large_image",
-    title: "Aula virtual",
-    description: "Encontrá lo que buscás en Aula virtual",
-    images: ["/og-image.jpg"],
-  },
-
-  other: {
-    "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-status-bar-style": "black-translucent",
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Aula virtual',
-  },
+  description: "Aula virtual ",
+  
 };
 
 export default function RootLayout({
@@ -174,7 +130,7 @@ export default function RootLayout({
               style={{ zIndex: 9999 }}
             />
           </main>
-         
+
           <Footer />
         </Providers>
       </body>

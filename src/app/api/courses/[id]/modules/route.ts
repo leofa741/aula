@@ -6,6 +6,8 @@ import { authOptions } from '@/app/lib/auth';
 import Course from '@/app/models/Course';
 import StudentNote from '@/app/models/StudentNote';
 
+
+
 // ✅ POST: Agregar un módulo/contenido a un curso
 export async function POST(
   req: NextRequest,
@@ -42,7 +44,9 @@ export async function POST(
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
 
-    if (!content && type !== 'actividad' && type !== 'pdf') {
+   
+        // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad, pdf o comprimido
+    if (!content && type !== 'actividad' && type !== 'pdf' && type !== 'comprimido') {
       return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
 
@@ -156,7 +160,7 @@ export async function PUT(
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
 
-    if (!content && type !== 'actividad' && type !== 'pdf') {
+    if (!content && type !== 'actividad' && type !== 'pdf' && type !== 'comprimido') {
       return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
 
@@ -226,6 +230,7 @@ export async function DELETE(
     if (!module) {
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
+
 
     // Eliminar el subdocumento del array
     module.deleteOne();

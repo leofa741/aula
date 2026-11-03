@@ -51,7 +51,7 @@ export async function PUT(
     // ✅ 4. (OPCIONAL PERO RECOMENDADO) Notificar al alumno por email
       // ✅ 4. Notificar al alumno por email con registro de errores real
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const appUrl = process.env.NEXT_APP_URL || 'http://localhost:3000';
       
       const emailRes = await fetch(`${appUrl}/api/notify-correction`, {
         method: 'POST',

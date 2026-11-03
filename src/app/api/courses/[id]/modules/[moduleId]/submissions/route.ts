@@ -96,8 +96,9 @@ export async function POST(
           `module-${m.order}` === moduleId
         );
 
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const appUrl = process.env.NEXT_APP_URL || 'http://localhost:3000';
         const classroomUrl = `${appUrl}/aula/cursos/${courseId}`;
+
 
         // Llamamos a nuestra API de notificación en segundo plano
         await fetch(`${appUrl}/api/notify-submission`, {

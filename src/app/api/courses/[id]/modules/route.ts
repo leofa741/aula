@@ -6,8 +6,6 @@ import { authOptions } from '@/app/lib/auth';
 import Course from '@/app/models/Course';
 import StudentNote from '@/app/models/StudentNote';
 
-
-
 // ✅ POST: Agregar un módulo/contenido a un curso
 export async function POST(
   req: NextRequest,
@@ -39,13 +37,11 @@ export async function POST(
     const body = await req.json();
     const { title, description, content, type, assignmentFileUrl } = body;
 
-    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad/pdf
+    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad, pdf o comprimido
     if (!title) {
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
 
-   
-        // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad, pdf o comprimido
     if (!content && type !== 'actividad' && type !== 'pdf' && type !== 'comprimido') {
       return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
@@ -61,11 +57,32 @@ export async function POST(
       description: description || '',
       content: content || '',
       type: type || 'texto',
-      assignmentFileUrl: assignmentFileUrl || '', // ✅ GUARDAR URL DEL ARCHIVO
+      assignmentFileUrl: assignmentFileUrl || '', 
       order: nextOrder
     });
 
     await course.save();
+
+    // 📧 NUEVO: NOTIFICAR A LOS ALUMNOS SOBRE EL NUEVO CONTENIDO
+    try {
+      const origin = req.nextUrl.origin; // Detecta automáticamente localhost o la URL de Vercel
+      const classroomUrl = `${origin}/aula/cursos/${courseId}`;
+      
+      // Disparamos la notificación en segundo plano (sin await para no bloquear la respuesta al usuario)
+      fetch(`${origin}/api/notify-new-module`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          courseTitle: course.title,
+          moduleTitle: title,
+          moduleType: type || 'texto',
+          classroomUrl
+        })
+      }).catch(err => console.error('Error disparando notificación de nuevo módulo:', err));
+    } catch (notifyError) {
+      console.error('Error configurando la notificación:', notifyError);
+    }
 
     return NextResponse.json({ 
       success: true, 
@@ -155,7 +172,6 @@ export async function PUT(
     const body = await req.json();
     const { title, description, content, type, assignmentFileUrl } = body;
 
-    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad/pdf
     if (!title) {
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
@@ -230,7 +246,6 @@ export async function DELETE(
     if (!module) {
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
-
 
     // Eliminar el subdocumento del array
     module.deleteOne();

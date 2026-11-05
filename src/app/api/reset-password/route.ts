@@ -69,7 +69,7 @@ export async function POST(request: Request) {
         // Genera un token único
         const token = crypto.randomBytes(32).toString('hex');
     
-        const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/change-password?token=${token}`;
+        const resetLink = `${process.env.NEXT_APP_URL}/change-password?token=${token}`;
 
         // Guarda el token en la base de datos (con expiración, si es necesario)
         await saveResetToken(user.id, token);

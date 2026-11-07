@@ -59,13 +59,14 @@ export async function POST(req: Request) {
     // Construir contenido del email
     const emailContent = buildEmailContent(body);
 
-    const mailOptions = {
-      from: `"Aula Virtual" <${process.env.MAILER_EMAIL}>`,
-      to: process.env.MAILER_EMAIL, // El email del administrador/profesor principal
+     const mailOptions = {
+      from: `"Pretty Witches" <${process.env.MAILER_EMAIL}>`, // ✅ Envía desde infoplataformaweb@gmail.com
+      to: process.env.MAILER_ADMIN_LOG || "gojijuabbe@gmail.com", // ✅ Llega a tu cuenta personal/admin
+      replyTo: email, // ✅ TRUCO: Al dar "Responder" en Gmail, se dirige al cliente que escribió
       cc: process.env.MAILER_CC ? process.env.MAILER_CC.split(',').map((e: string) => e.trim()) : undefined,
-      subject: `🎓 ${subjectLabels[subject]} - ${name}`,
+      subject: `✨ Nueva consulta: ${subjectLabels[subject]} - ${name}`,
       html: emailContent,
-      text: buildTextContent(body), // Fallback para clientes que no soportan HTML
+      text: buildTextContent(body),
     };
 
     await transporter.sendMail(mailOptions);

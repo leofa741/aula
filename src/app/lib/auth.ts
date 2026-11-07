@@ -39,7 +39,7 @@ async function sendWelcomeEmail(to: string, name: string) {
       },
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+    const baseUrl = process.env.NEXT_APP_URL || 'http://localhost:3000';
 
     await transporter.sendMail({
       from: `"Aula Virtual" <${process.env.MAILER_EMAIL}>`,

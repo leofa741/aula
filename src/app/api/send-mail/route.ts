@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
      const mailOptions = {
       from: `"Pretty Witches" <${process.env.MAILER_EMAIL}>`, // ✅ Envía desde infoplataformaweb@gmail.com
-      to: process.env.MAILER_ADMIN_LOG || "gojijuabbe@gmail.com", // ✅ Llega a tu cuenta personal/admin
+      to: process.env.MAILER_ADMIN_LOG || "coaatlas@gmail.com", // ✅ Llega a tu cuenta personal/admin
       replyTo: email, // ✅ TRUCO: Al dar "Responder" en Gmail, se dirige al cliente que escribió
       cc: process.env.MAILER_CC ? process.env.MAILER_CC.split(',').map((e: string) => e.trim()) : undefined,
       subject: `✨ Nueva consulta: ${subjectLabels[subject]} - ${name}`,

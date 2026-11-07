@@ -9,9 +9,9 @@ const Footer = () => {
   const companyName = 'Aula Virtual';
   const [showShareModal, setShowShareModal] = useState(false);
 
-  const watsapp = 5491141461312
+  const watsapp = 5491154164530
   const mensaje = 'Hola,%20me%20interesa%20consultar%20sobre%20el%20proyecto%20Aula%20Virtual.%20¡Gracias!'
-  const EMAIL_SGTULOOK = 'aulavirtualk@gmail.com';
+  const EMAIL_SGTULOOK = 'gojijuabbe@gmail.com';
 
   // ─────────────────────────────────────────────────────────
   // FUNCIONES DE COMPARTIR

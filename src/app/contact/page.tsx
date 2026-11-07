@@ -55,7 +55,7 @@ export default function Contact() {
   const [status, setStatus] = useState<{ type: 'success' | 'error' | ''; message: string }>({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
 
-  const whatsappNumber = '5491132538837'; // Cambiar por el número real de soporte
+  const whatsappNumber = '5491154164530'; // Cambiar por el número real de soporte
   const whatsappMessage = 'Hola, necesito soporte con el Aula Virtual.';
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {

@@ -9,6 +9,7 @@ export async function POST(req: Request) {
     if (!studentEmail || !status) {
       return NextResponse.json({ success: false, message: 'Faltan datos' }, { status: 400 });
     }
+    
 
     const transporter = nodemailer.createTransport({
       service: process.env.MAILER_SERVICE || 'gmail',

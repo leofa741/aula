@@ -63,8 +63,8 @@ export default function Navbar() {
   const [isMounted, setIsMounted] = useState(false);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const watsapp = 5491132538837
-  const mensaje = 'Hola,%20me%20interesa%20consultar%20por%20una%20propiedad'
+  const watsapp = 5491154164530
+  const mensaje = 'Hola, me gustaría obtener más información sobre sus cursos y servicios.';
 
 
   useEffect(() => {

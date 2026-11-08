@@ -41,16 +41,16 @@ export default function HomePage() {
           </p>
         </div>
 
-        {/* Badge de estado elegante */}
+        {/* Badge de estado elegante 
         <div className="pt-2">
           <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-slate-900/50 backdrop-blur-md border border-slate-800 text-slate-400 text-sm font-medium tracking-wide">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
             </span>
-            Sitio en desarrollo
+            
           </div>
-        </div>
+        </div>*/}
 
         {/* Contacto discreto para no perder oportunidades */}
         <div className="pt-4">

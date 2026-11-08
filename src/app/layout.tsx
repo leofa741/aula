@@ -83,7 +83,7 @@ export default function RootLayout({
             {children}
 
             <a
-              href="https://wa.me/5491141461312?text=Hola,%20me%20interesa%20consultar%20por%20una%20propiedad"
+              href="https://wa.me/5491154164530?text=Hola,%20me%20gustaría%20recibir%20soporte%20con%20el%20Aula%20Virtual."
               target="_blank"
               rel="noopener noreferrer"
               className="fixed bottom-6 right-6 z-50"

@@ -64,7 +64,7 @@ async function sendWelcomeEmail(to: string, name: string) {
           <div class="body">
             <p>Hola <strong>${name}</strong>,</p>
             <p>Tu cuenta ha sido creada exitosamente. Ya puedes acceder a la plataforma para ver tus cursos, materiales y tareas asignadas.</p>
-            <a href="${baseUrl}/aula" class="cta">Ir al Aula Virtual →</a>
+            <a href="${baseUrl}" class="cta">Ir al Aula Virtual →</a>
             <p style="margin-top: 24px; font-size: 14px; color: #94a3b8;">Si no solicitaste este registro, ignora este correo.</p>
           </div>
         </body>

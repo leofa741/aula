@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { 
   FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, 
   FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaDownload, 
-  FaFileArchive, FaLock // ✅ Agregado FaLock
+  FaFileArchive, FaLock, FaExclamationTriangle // ✅ Agregado para alerta de bloqueo
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
@@ -93,7 +93,6 @@ export default function StudentCourseDetailPage() {
         for (const module of modules) {
           const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
           if (moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido') {
-            // ✅ CLAVE UNIFICADA: Usamos el order como string para que coincida con el backend
             const moduleIdStr = String(module.order);
             try {
               const res = await fetch(`/api/courses/${courseId}/modules/${moduleIdStr}/submissions`);
@@ -112,15 +111,48 @@ export default function StudentCourseDetailPage() {
     }
   }, [status, courseId, modules]);
 
-  // 🔒 LÓGICA DEL CANDADO: Un módulo está bloqueado si el anterior NO está aprobado
+  // 🔒 NUEVA LÓGICA DEL CANDADO INTELIGENTE
+  // Un módulo solo se bloquea si hay un módulo ANTERIOR que requiera entrega y NO esté aprobado.
+  // Los módulos de solo lectura (texto, video, enlace) NO bloquean el progreso.
   const isModuleLocked = (currentOrder: number): boolean => {
-    if (currentOrder === 1) return false; // El primero siempre está desbloqueado
-    
-    const prevOrder = String(currentOrder - 1);
-    const prevSubmission = submissions[prevOrder];
-    
-    // Si no hay entrega previa, o no está aprobada, está bloqueado
-    return !prevSubmission || prevSubmission.status !== 'aprobado';
+    if (currentOrder === 1) return false;
+
+    for (let i = currentOrder - 1; i >= 1; i--) {
+      const prevModule = modules.find(m => m.order === i);
+      if (prevModule) {
+        const prevModuleType = prevModule.type ? String(prevModule.type).toLowerCase().trim() : 'texto';
+        const isPrevAssignment = prevModuleType === 'actividad' || prevModuleType === 'pdf' || prevModuleType === 'comprimido';
+        
+        if (isPrevAssignment) {
+          const prevSubmission = submissions[String(i)];
+          // Si encontramos un entregable anterior que NO está aprobado, bloqueamos el camino
+          if (!prevSubmission || prevSubmission.status !== 'aprobado') {
+            return true;
+          }
+          // Si está aprobado, seguimos buscando hacia atrás por si hay otro entregable pendiente
+        }
+      }
+    }
+    return false; // Todos los entregables anteriores están aprobados (o no hay entregables anteriores)
+  };
+
+  // 🔍 Función auxiliar para decirle al alumno EXACTAMENTE qué módulo debe aprobar
+  const getBlockingModuleOrder = (currentOrder: number): number | null => {
+    for (let i = currentOrder - 1; i >= 1; i--) {
+      const prevModule = modules.find(m => m.order === i);
+      if (prevModule) {
+        const prevModuleType = prevModule.type ? String(prevModule.type).toLowerCase().trim() : 'texto';
+        const isPrevAssignment = prevModuleType === 'actividad' || prevModuleType === 'pdf' || prevModuleType === 'comprimido';
+        
+        if (isPrevAssignment) {
+          const prevSubmission = submissions[String(i)];
+          if (!prevSubmission || prevSubmission.status !== 'aprobado') {
+            return i; // Este es el módulo que está frenando el progreso
+          }
+        }
+      }
+    }
+    return null;
   };
 
   const handleJoinLiveClass = () => {
@@ -141,7 +173,6 @@ export default function StudentCourseDetailPage() {
     }
   };
 
-  // ✅ El parámetro ahora es moduleIdStr (String del order)
   const handleStudentSubmit = async (moduleIdStr: string) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -261,14 +292,14 @@ export default function StudentCourseDetailPage() {
               <div className="space-y-4">
                 {modules.map((module) => {
                   const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
-                  // ✅ CLAVE UNIFICADA para que coincida con el backend
                   const moduleIdStr = String(module.order);
                   const isUrlContent = module.content?.trim().startsWith('http://') || module.content?.trim().startsWith('https://');
                   const isAssignment = moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido';
                   const mySubmission = submissions[moduleIdStr];
                   
-                  // 🔒 Evaluamos si este módulo está bloqueado
+                  // 🔒 Evaluamos si este módulo está bloqueado con la nueva lógica
                   const locked = isModuleLocked(module.order);
+                  const blockingOrder = getBlockingModuleOrder(module.order);
 
                   return (
                     <div 
@@ -293,7 +324,6 @@ export default function StudentCourseDetailPage() {
                               {moduleType}
                             </span>
                             
-                            {/* Badges de estado */}
                             {locked && (
                               <span className="text-[10px] uppercase tracking-wider text-rose-400 border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                                 <FaLock className="w-2.5 h-2.5" /> Bloqueado
@@ -311,14 +341,16 @@ export default function StudentCourseDetailPage() {
                           {/* 🔒 CONTENIDO BLOQUEADO */}
                           {locked ? (
                             <div className="mt-4 p-6 text-center rounded-lg bg-slate-950/50 border border-slate-800 border-dashed">
-                              <FaLock className="mx-auto text-3xl text-slate-600 mb-2" />
+                              <FaExclamationTriangle className="mx-auto text-3xl text-amber-500 mb-2" />
                               <p className="text-slate-300 text-sm font-medium">Contenido bloqueado</p>
-                              <p className="text-slate-500 text-xs mt-1">
-                                Debes tener la actividad del <span className="text-emerald-400 font-bold">Módulo {module.order - 1}</span> aprobada por el profesor para desbloquear este material.
+                              <p className="text-slate-500 text-xs mt-1 max-w-md mx-auto">
+                                Debes tener aprobada la entrega del{' '}
+                                <span className="text-emerald-400 font-bold">Módulo {blockingOrder}</span>{' '}
+                                por el profesor para desbloquear este material.
                               </p>
                             </div>
                           ) : (
-                            /* ✅ CONTENIDO DESBLOQUEADO (Tu código original intacto) */
+                            /* ✅ CONTENIDO DESBLOQUEADO */
                             <>
                               {module.description && <p className="text-sm text-slate-400 mb-3">{module.description}</p>}
 

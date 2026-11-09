@@ -643,6 +643,7 @@ export default function CursoContenidoPage() {
           </div>
         </div>
       </div>
+      
     </div>
   );
 }

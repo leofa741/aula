@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaFileWord, FaCheckCircle, FaTimesCircle, FaDownload, FaFileArchive, FaUsers, FaLayerGroup, FaKey } from 'react-icons/fa'; // ✅ Agregado FaKey
+import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaFileWord, FaCheckCircle, FaTimesCircle, FaDownload, FaFileArchive, FaUsers, FaLayerGroup, FaKey } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -180,7 +180,6 @@ export default function CursoContenidoPage() {
       });
 
       if (res.ok) {
-        // ✅ MEJORA: Mensaje que confirma el desbloqueo
         Swal.fire({ 
           icon: 'success', 
           title: statusGrade === 'aprobado' ? '¡Aprobado!' : 'Rechazado', 
@@ -280,13 +279,21 @@ export default function CursoContenidoPage() {
         finalContent = 'Archivo adjunto al módulo';
       }
 
+      // ✅ CORRECCIÓN DE SEGURIDAD: Si hay alumnos seleccionados pero el tipo es 'todos', lo corregimos automáticamente
+      let finalAssignmentType = assignmentType;
+      if (selectedStudentIds.length > 0 && assignmentType === 'todos') {
+        finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
+      } else if (selectedStudentIds.length === 0) {
+        finalAssignmentType = 'todos';
+      }
+
       const payload = {
         ...formData,
         content: finalContent,
         assignmentFileUrl,
-        assignmentType,
-        assignedStudentIds: (assignmentType === 'especificos' || assignmentType === 'grupo') ? selectedStudentIds : [],
-        customGroupName: assignmentType === 'grupo' ? customGroupName : undefined,
+        assignmentType: finalAssignmentType,
+        assignedStudentIds: (finalAssignmentType === 'especificos' || finalAssignmentType === 'grupo') ? selectedStudentIds : [],
+        customGroupName: finalAssignmentType === 'grupo' ? customGroupName : undefined,
       };
 
       const url = editingModuleOrder
@@ -439,8 +446,15 @@ export default function CursoContenidoPage() {
                                       type="checkbox"
                                       checked={selectedStudentIds.includes(sId)}
                                       onChange={(e) => {
-                                        if (e.target.checked) setSelectedStudentIds([...selectedStudentIds, sId]);
-                                        else setSelectedStudentIds(selectedStudentIds.filter(id => id !== sId));
+                                        if (e.target.checked) {
+                                          // ✅ FEEDBACK VISUAL: Si marca un checkbox y estaba en 'todos', cambiamos automáticamente
+                                          if (assignmentType === 'todos') {
+                                            setAssignmentType(customGroupName ? 'grupo' : 'especificos');
+                                          }
+                                          setSelectedStudentIds([...selectedStudentIds, sId]);
+                                        } else {
+                                          setSelectedStudentIds(selectedStudentIds.filter(id => id !== sId));
+                                        }
                                       }}
                                       className="rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-800 w-4 h-4"
                                     />
@@ -528,7 +542,8 @@ export default function CursoContenidoPage() {
                             <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
                             <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">{moduleType}</span>
 
-                            {moduleType === 'actividad' && module.assignmentType && (
+                            {/* ✅ BADGE AMPLIADO: Ahora se muestra para actividad, pdf, comprimido y enlace */}
+                            {['actividad', 'pdf', 'comprimido', 'enlace'].includes(moduleType) && module.assignmentType && (
                               <span className="text-[10px] uppercase tracking-wider text-amber-400 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                                 <FaLayerGroup className="w-2.5 h-2.5" />
                                 {module.assignmentType === 'todos' ? 'Para todos' : module.assignedStudentIds?.length === 1 ? '1 alumno' : `${module.assignedStudentIds?.length || 0} alumnos`}
@@ -536,7 +551,6 @@ export default function CursoContenidoPage() {
                               </span>
                             )}
                             
-                            {/* ✅ NUEVO: Badge recordatorio de desbloqueo secuencial */}
                             {moduleType === 'actividad' && index < modules.length - 1 && (
                               <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                                 <FaKey className="w-2.5 h-2.5" /> Desbloquea el Módulo {module.order + 1}
@@ -643,7 +657,6 @@ export default function CursoContenidoPage() {
           </div>
         </div>
       </div>
-      
     </div>
   );
 }

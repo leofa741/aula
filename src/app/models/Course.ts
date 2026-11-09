@@ -7,6 +7,11 @@ export interface IModule {
   type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido'; // Agregado 'comprimido' como tipo válido
   assignmentFileUrl?: string; // URL del archivo de consigna subido por el profesor
   order: number;
+
+  // ✅ NUEVOS CAMPOS PARA ASIGNACIÓN DE ACTIVIDADES
+  assignmentType?: 'todos' | 'especificos' | 'grupo';
+  assignedStudentIds?: mongoose.Types.ObjectId[];
+  customGroupName?: string;
 }
 
 export interface ICourse extends Document {
@@ -28,7 +33,11 @@ const ModuleSchema = new Schema<IModule>({
   content: { type: String, default: '' }, // Cambiado a default ''
   type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad', 'comprimido'], default: 'texto' },
   assignmentFileUrl: { type: String, default: '' },
-  order: { type: Number, required: true }
+  order: { type: Number, required: true },
+  assignmentType: { type: String, enum: ['todos', 'especificos', 'grupo'], default: 'todos' },
+  assignedStudentIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+  customGroupName: { type: String, default: '' }
+
 }, { _id: false }); // Mantenemos _id: false para compatibilidad con tu BD actual
 
 const CourseSchema = new Schema<ICourse>(
@@ -40,10 +49,10 @@ const CourseSchema = new Schema<ICourse>(
     professor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     students: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     modules: [ModuleSchema],
-    status: { 
-      type: String, 
-      enum: ['activo', 'borrador', 'finalizado'], 
-      default: 'borrador' 
+    status: {
+      type: String,
+      enum: ['activo', 'borrador', 'finalizado'],
+      default: 'borrador'
     }
   },
   { timestamps: true }

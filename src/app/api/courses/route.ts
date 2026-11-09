@@ -1,3 +1,4 @@
+// src/app/api/courses/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import connectDB from '@/app/lib/mongoose';

@@ -23,6 +23,7 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     }
   },
   { timestamps: true }
+  
 );
 
 // Índice compuesto para evitar que un alumno se inscriba dos veces al mismo curso

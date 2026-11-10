@@ -279,7 +279,7 @@ export default function CursoContenidoPage() {
         finalContent = 'Archivo adjunto al módulo';
       }
 
-      // ✅ CORRECCIÓN DE SEGURIDAD: Si hay alumnos seleccionados pero el tipo es 'todos', lo corregimos automáticamente
+      // ✅ CORRECCIÓN DE SEGURIDAD: Si hay alumnos seleccionados pero el tipo es 'todos', lo corregimos automáticamente al guardar
       let finalAssignmentType = assignmentType;
       if (selectedStudentIds.length > 0 && assignmentType === 'todos') {
         finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
@@ -447,10 +447,6 @@ export default function CursoContenidoPage() {
                                       checked={selectedStudentIds.includes(sId)}
                                       onChange={(e) => {
                                         if (e.target.checked) {
-                                          // ✅ FEEDBACK VISUAL: Si marca un checkbox y estaba en 'todos', cambiamos automáticamente
-                                          if (assignmentType === 'todos') {
-                                            setAssignmentType(customGroupName ? 'grupo' : 'especificos');
-                                          }
                                           setSelectedStudentIds([...selectedStudentIds, sId]);
                                         } else {
                                           setSelectedStudentIds(selectedStudentIds.filter(id => id !== sId));

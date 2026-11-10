@@ -248,6 +248,15 @@ export default function CursoContenidoPage() {
     }
   };
 
+  // ✅ FUNCIÓN EXPLÍCITA PARA MANEJAR LA SELECCIÓN DE ALUMNOS
+  const handleStudentSelection = (studentId: string, isChecked: boolean) => {
+    if (isChecked) {
+      setSelectedStudentIds(prev => [...prev, studentId]);
+    } else {
+      setSelectedStudentIds(prev => prev.filter(id => id !== studentId));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -279,11 +288,15 @@ export default function CursoContenidoPage() {
         finalContent = 'Archivo adjunto al módulo';
       }
 
-      // ✅ CORRECCIÓN DE SEGURIDAD: Si hay alumnos seleccionados pero el tipo es 'todos', lo corregimos automáticamente al guardar
+      // ✅ LÓGICA DE ASIGNACIÓN INFALIBLE
       let finalAssignmentType = assignmentType;
+      
+      // Si el usuario marcó alumnos pero olvidó cambiar el dropdown de "todos", lo corregimos
       if (selectedStudentIds.length > 0 && assignmentType === 'todos') {
         finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
-      } else if (selectedStudentIds.length === 0) {
+      } 
+      // Si no hay alumnos seleccionados, forzamos que sea para "todos"
+      else if (selectedStudentIds.length === 0) {
         finalAssignmentType = 'todos';
       }
 
@@ -295,6 +308,9 @@ export default function CursoContenidoPage() {
         assignedStudentIds: (finalAssignmentType === 'especificos' || finalAssignmentType === 'grupo') ? selectedStudentIds : [],
         customGroupName: finalAssignmentType === 'grupo' ? customGroupName : undefined,
       };
+
+      // 🔍 DEPURACIÓN: Esto te mostrará en la consola del navegador EXACTAMENTE qué se envía
+      console.log("🚀 PAYLOAD ENVIADO AL BACKEND:", JSON.stringify(payload, null, 2));
 
       const url = editingModuleOrder
         ? `/api/courses/${courseId}/modules/${editingModuleOrder}`
@@ -445,13 +461,7 @@ export default function CursoContenidoPage() {
                                     <input
                                       type="checkbox"
                                       checked={selectedStudentIds.includes(sId)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedStudentIds([...selectedStudentIds, sId]);
-                                        } else {
-                                          setSelectedStudentIds(selectedStudentIds.filter(id => id !== sId));
-                                        }
-                                      }}
+                                      onChange={(e) => handleStudentSelection(sId, e.target.checked)}
                                       className="rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-800 w-4 h-4"
                                     />
                                     <span className="truncate">{sName}</span>
@@ -538,7 +548,6 @@ export default function CursoContenidoPage() {
                             <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
                             <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">{moduleType}</span>
 
-                            {/* ✅ BADGE AMPLIADO: Ahora se muestra para actividad, pdf, comprimido y enlace */}
                             {['actividad', 'pdf', 'comprimido', 'enlace'].includes(moduleType) && module.assignmentType && (
                               <span className="text-[10px] uppercase tracking-wider text-amber-400 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                                 <FaLayerGroup className="w-2.5 h-2.5" />

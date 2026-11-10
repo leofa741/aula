@@ -1,4 +1,3 @@
-// src/app/api/courses/[id]/modules/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import connectDB from '@/app/lib/mongoose';
@@ -26,7 +25,6 @@ export async function POST(
       return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
     }
 
-    // Validar que sea el profesor del curso o un admin
     const isOwner = course.professor.toString() === session.user.id;
     const isAdmin = ['admin', 'superadmin'].includes(session.user.role);
 
@@ -35,9 +33,13 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { title, description, content, type, assignmentFileUrl } = body;
+    
+    // ✅ NUEVO: Extraemos los campos de asignación del body
+    const { 
+      title, description, content, type, assignmentFileUrl, 
+      assignmentType, assignedStudentIds, customGroupName 
+    } = body;
 
-    // ✅ VALIDACIÓN FLEXIBLE: Solo requiere content si NO es actividad, pdf o comprimido
     if (!title) {
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
     }
@@ -46,29 +48,30 @@ export async function POST(
       return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
 
-    // Calcular el siguiente orden (order)
     const nextOrder = course.modules.length > 0 
       ? Math.max(...course.modules.map((m: any) => m.order)) + 1 
       : 1;
 
-    // ✅ Agregar el nuevo módulo CON assignmentFileUrl
+    // ✅ NUEVO: Guardamos los campos de asignación en el nuevo módulo
     course.modules.push({
       title,
       description: description || '',
       content: content || '',
       type: type || 'texto',
       assignmentFileUrl: assignmentFileUrl || '', 
-      order: nextOrder
+      order: nextOrder,
+      assignmentType: assignmentType || 'todos',
+      assignedStudentIds: assignedStudentIds || [],
+      customGroupName: customGroupName || ''
     });
 
     await course.save();
 
-    // 📧 NUEVO: NOTIFICAR A LOS ALUMNOS SOBRE EL NUEVO CONTENIDO
+    // 📧 Notificar a los alumnos (tu código original intacto)
     try {
-      const origin = req.nextUrl.origin; // Detecta automáticamente localhost o la URL de Vercel
+      const origin = req.nextUrl.origin;
       const classroomUrl = `${origin}/aula/cursos/${courseId}`;
       
-      // Disparamos la notificación en segundo plano (sin await para no bloquear la respuesta al usuario)
       fetch(`${origin}/api/notify-new-module`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,7 +115,6 @@ export async function GET(
 
     const sortedModules = course.modules.sort((a: any, b: any) => a.order - b.order);
 
-    // Buscar la nota del alumno actual
     let studentNote = null;
     const session = await getServerSession(authOptions);
     
@@ -161,7 +163,6 @@ export async function PUT(
       return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
     }
 
-    // Validar permisos (dueño o admin)
     const isOwner = course.professor.toString() === session.user.id;
     const isAdmin = ['admin', 'superadmin'].includes(session.user.role);
 
@@ -170,7 +171,12 @@ export async function PUT(
     }
 
     const body = await req.json();
-    const { title, description, content, type, assignmentFileUrl } = body;
+    
+    // ✅ NUEVO: Extraemos los campos de asignación del body
+    const { 
+      title, description, content, type, assignmentFileUrl,
+      assignmentType, assignedStudentIds, customGroupName
+    } = body;
 
     if (!title) {
       return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
@@ -180,23 +186,22 @@ export async function PUT(
       return NextResponse.json({ error: 'El contenido es obligatorio para este tipo de módulo' }, { status: 400 });
     }
 
-    // Buscar el módulo específico dentro del array
     const module = course.modules.id(moduleId);
 
     if (!module) {
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
 
-    // ✅ Actualizar los campos del módulo CON assignmentFileUrl
+    // ✅ NUEVO: Actualizamos los campos de asignación
     module.title = title;
     module.description = description || '';
     module.content = content || '';
     module.type = type || 'texto';
     
-    // ✅ SOLO actualizar assignmentFileUrl si se envió uno nuevo
-    if (assignmentFileUrl !== undefined) {
-      module.assignmentFileUrl = assignmentFileUrl;
-    }
+    if (assignmentFileUrl !== undefined) module.assignmentFileUrl = assignmentFileUrl;
+    if (assignmentType !== undefined) module.assignmentType = assignmentType;
+    if (assignedStudentIds !== undefined) module.assignedStudentIds = assignedStudentIds;
+    if (customGroupName !== undefined) module.customGroupName = customGroupName;
 
     await course.save();
 
@@ -232,7 +237,6 @@ export async function DELETE(
       return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
     }
 
-    // Validar permisos (dueño o admin)
     const isOwner = course.professor.toString() === session.user.id;
     const isAdmin = ['admin', 'superadmin'].includes(session.user.role);
 
@@ -240,17 +244,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'No tienes permiso para modificar este curso' }, { status: 403 });
     }
 
-    // Buscar el módulo
     const module = course.modules.id(moduleId);
 
     if (!module) {
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
 
-    // Eliminar el subdocumento del array
     module.deleteOne();
 
-    // Reordenar los módulos restantes
     course.modules.forEach((m: any, index: number) => {
       m.order = index + 1;
     });

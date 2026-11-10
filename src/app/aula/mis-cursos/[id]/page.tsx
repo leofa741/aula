@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { 
   FaArrowLeft, FaSpinner, FaVideo, FaPlayCircle, FaFilePdf, FaFileAlt, 
   FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaDownload, 
-  FaFileArchive, FaLock, FaExclamationTriangle // ✅ Agregado para alerta de bloqueo
+  FaFileArchive, FaLock, FaExclamationTriangle 
 } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
@@ -27,6 +27,10 @@ interface Module {
   type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
   assignmentFileUrl?: string;
   order: number;
+  // ✅ Campos necesarios para el filtro de visibilidad
+  assignmentType?: 'todos' | 'especificos' | 'grupo';
+  assignedStudentIds?: string[];
+  customGroupName?: string;
 }
 
 interface Submission {
@@ -69,7 +73,23 @@ export default function StudentCourseDetailPage() {
         if (res.ok) {
           const data = await res.json();
           setCourseTitle(data.courseTitle);
-          setModules(data.modules || []);
+          
+          // ✅ FILTRO DE VISIBILIDAD DE MÓDULOS
+          const studentId = session?.user?.id;
+          const visibleModules = (data.modules || []).filter((module: any) => {
+            // 1. Si es para todos, es visible
+            if (module.assignmentType === 'todos') return true;
+            
+            // 2. Si es para específicos o grupo, verificamos si el ID del alumno está en la lista
+            if (module.assignmentType === 'especificos' || module.assignmentType === 'grupo') {
+              return module.assignedStudentIds?.includes(studentId);
+            }
+            
+            // 3. Por defecto (módulos antiguos sin esta configuración), los mostramos
+            return true;
+          });
+
+          setModules(visibleModules);
           setStudentNote(data.studentNote || null);
         } else {
           router.push('/aula/mis-cursos');
@@ -81,10 +101,11 @@ export default function StudentCourseDetailPage() {
       }
     };
 
-    if (status === 'authenticated' && courseId) {
+    // ✅ Agregamos session?.user?.id a las dependencias para que se ejecute cuando tengamos el usuario
+    if (status === 'authenticated' && courseId && session?.user?.id) {
       fetchCourseData();
     }
-  }, [status, courseId]);
+  }, [status, courseId, session?.user?.id, router]);
 
   useEffect(() => {
     if (status === 'authenticated' && courseId && modules.length > 0) {
@@ -111,9 +132,7 @@ export default function StudentCourseDetailPage() {
     }
   }, [status, courseId, modules]);
 
-  // 🔒 NUEVA LÓGICA DEL CANDADO INTELIGENTE
-  // Un módulo solo se bloquea si hay un módulo ANTERIOR que requiera entrega y NO esté aprobado.
-  // Los módulos de solo lectura (texto, video, enlace) NO bloquean el progreso.
+  // 🔒 LÓGICA DEL CANDADO INTELIGENTE
   const isModuleLocked = (currentOrder: number): boolean => {
     if (currentOrder === 1) return false;
 
@@ -125,18 +144,15 @@ export default function StudentCourseDetailPage() {
         
         if (isPrevAssignment) {
           const prevSubmission = submissions[String(i)];
-          // Si encontramos un entregable anterior que NO está aprobado, bloqueamos el camino
           if (!prevSubmission || prevSubmission.status !== 'aprobado') {
             return true;
           }
-          // Si está aprobado, seguimos buscando hacia atrás por si hay otro entregable pendiente
         }
       }
     }
-    return false; // Todos los entregables anteriores están aprobados (o no hay entregables anteriores)
+    return false;
   };
 
-  // 🔍 Función auxiliar para decirle al alumno EXACTAMENTE qué módulo debe aprobar
   const getBlockingModuleOrder = (currentOrder: number): number | null => {
     for (let i = currentOrder - 1; i >= 1; i--) {
       const prevModule = modules.find(m => m.order === i);
@@ -147,7 +163,7 @@ export default function StudentCourseDetailPage() {
         if (isPrevAssignment) {
           const prevSubmission = submissions[String(i)];
           if (!prevSubmission || prevSubmission.status !== 'aprobado') {
-            return i; // Este es el módulo que está frenando el progreso
+            return i;
           }
         }
       }
@@ -297,7 +313,6 @@ export default function StudentCourseDetailPage() {
                   const isAssignment = moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido';
                   const mySubmission = submissions[moduleIdStr];
                   
-                  // 🔒 Evaluamos si este módulo está bloqueado con la nueva lógica
                   const locked = isModuleLocked(module.order);
                   const blockingOrder = getBlockingModuleOrder(module.order);
 
@@ -338,7 +353,6 @@ export default function StudentCourseDetailPage() {
 
                           <h4 className="text-white font-semibold mb-1">{module.title}</h4>
 
-                          {/* 🔒 CONTENIDO BLOQUEADO */}
                           {locked ? (
                             <div className="mt-4 p-6 text-center rounded-lg bg-slate-950/50 border border-slate-800 border-dashed">
                               <FaExclamationTriangle className="mx-auto text-3xl text-amber-500 mb-2" />
@@ -350,7 +364,6 @@ export default function StudentCourseDetailPage() {
                               </p>
                             </div>
                           ) : (
-                            /* ✅ CONTENIDO DESBLOQUEADO */
                             <>
                               {module.description && <p className="text-sm text-slate-400 mb-3">{module.description}</p>}
 

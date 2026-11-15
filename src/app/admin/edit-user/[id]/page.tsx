@@ -79,6 +79,7 @@ export default function EditUserPage() {
     const { name, value } = e.target;
     if (user) setUser(prev => ({ ...prev!, [name]: value }));
   };
+  
 
   const handleUpdateUser = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

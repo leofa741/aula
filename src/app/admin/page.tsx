@@ -8,8 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faUsers, faUserGraduate, faChalkboardTeacher } from '@fortawesome/free-solid-svg-icons';
-import PanelGestionPage from '../gestion/page';
+import { faArrowLeft, faUsers, faUserGraduate, faChalkboardTeacher, faCreditCard, faGift } from '@fortawesome/free-solid-svg-icons';
 
 interface User {
   _id: string;
@@ -20,6 +19,7 @@ interface User {
   city: string;
   role: 'superadmin' | 'admin' | 'profesor' | 'alumno' | string;
   img?: string;
+  paymentStatus?: 'free' | 'pagado';
 }
 
 export default function AdminPage() {
@@ -63,7 +63,7 @@ export default function AdminPage() {
 
     validateAndFetch();
   }, [session, status, router]);
-
+  
   const fetchUsers = async (token: string) => {
     setIsLoading(true);
     try {
@@ -83,6 +83,53 @@ export default function AdminPage() {
       toast.error('Hubo un error al cargar los usuarios');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleUpdatePaymentStatus = async (userId: string, currentStatus: string) => {
+    const token = session?.user?.token || localStorage.getItem('token');
+    if (!token) return;
+
+    const { value: newStatus } = await Swal.fire({
+      title: 'Estado de Pago del Alumno',
+      input: 'select',
+      inputOptions: {
+        'free': '🎁 Modo Free (Gratuito)',
+        'pagado': '💳 Pagado',
+      },
+      inputValue: currentStatus || 'free',
+      showCancelButton: true,
+      confirmButtonText: 'Guardar Cambio',
+      cancelButtonText: 'Cancelar',
+      background: '#0f172a',
+      color: '#f1f5f9',
+      confirmButtonColor: '#8b5cf6',
+      cancelButtonColor: '#475569',
+    });
+
+    if (newStatus && newStatus !== currentStatus) {
+      try {
+        const formData = new FormData();
+        formData.append('paymentStatus', newStatus);
+
+        const response = await fetch(`/api/admin/users?id=${userId}`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        });
+
+        if (response.ok) {
+          toast.success('Estado de pago actualizado correctamente');
+          setUsers(prevUsers => 
+            prevUsers.map(u => u._id === userId ? { ...u, paymentStatus: newStatus as 'free' | 'pagado' } : u)
+          );
+        } else {
+          throw new Error('Error al actualizar');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error('No se pudo actualizar el estado de pago');
+      }
     }
   };
 
@@ -136,7 +183,6 @@ export default function AdminPage() {
     );
   }
 
-  // 🔹 AGRUPAR POR ROLES DEL AULA VIRTUAL
   const admins = users.filter(u => ['admin', 'superadmin'].includes(u.role));
   const profesores = users.filter(u => u.role === 'profesor');
   const alumnos = users.filter(u => u.role === 'alumno');
@@ -169,7 +215,7 @@ export default function AdminPage() {
                 <th className={tableHeaderClasses}>Nombre</th>
                 <th className={tableHeaderClasses}>Correo</th>
                 <th className={tableHeaderClasses}>Ciudad</th>
-                <th className={tableHeaderClasses}>Teléfono</th>
+                <th className={tableHeaderClasses}>Estado Pago</th>
                 <th className={tableHeaderClasses}>Acciones</th>
               </tr>
             </thead>
@@ -182,17 +228,54 @@ export default function AdminPage() {
                         <div className="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-slate-600/50">
                           <Image src={user.img} alt="Avatar" fill className="object-cover bg-slate-700" />
                         </div>
-                      ) : <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">{user.name[0]}</div>}
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 text-xs">
+                          {user.name[0]}
+                        </div>
+                      )}
                       <span className="font-medium text-white">{user.name} {user.lastName}</span>
                     </div>
                   </td>
                   <td className={`${tableCellClasses} break-all max-w-[200px]`}>{user.email}</td>
                   <td className={tableCellClasses}>{user.city || '—'}</td>
-                  <td className={tableCellClasses}>{user.phone || '—'}</td>
+                  
+                  <td className={tableCellClasses}>
+                    {user.role === 'alumno' ? (
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                        user.paymentStatus === 'pagado' 
+                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                          : 'bg-slate-500/15 text-slate-400 border-slate-500/30'
+                      }`}>
+                        {user.paymentStatus === 'pagado' ? (
+                          <FontAwesomeIcon icon={faCreditCard} className="w-3 h-3" />
+                        ) : (
+                          <FontAwesomeIcon icon={faGift} className="w-3 h-3" />
+                        )}
+                        {user.paymentStatus === 'pagado' ? 'Pagado' : 'Free'}
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 text-xs">N/A</span>
+                    )}
+                  </td>
+
                   <td className={tableCellClasses}>
                     <div className="flex gap-2">
-                      <Link href={`/admin/edit-user/${user._id}`} className="bg-amber-600/90 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.98]">Editar</Link>
-                      <button onClick={() => handleDeleteUser(user._id)} className="bg-rose-600/90 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.98]">Eliminar</button>
+                      {user.role === 'alumno' && (
+                        <button 
+                          onClick={() => handleUpdatePaymentStatus(user._id, user.paymentStatus || 'free')}
+                          className="bg-violet-600/90 hover:bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.98] flex items-center gap-1"
+                          title="Cambiar estado de pago"
+                        >
+                          <FontAwesomeIcon icon={faCreditCard} className="w-3 h-3" />
+                          Estado
+                        </button>
+                      )}
+                      <Link href={`/admin/edit-user/${user._id}`} className="bg-amber-600/90 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.98]">
+                        Editar
+                      </Link>
+                      <button onClick={() => handleDeleteUser(user._id)} className="bg-rose-600/90 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition active:scale-[0.98]">
+                        Eliminar
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -201,7 +284,7 @@ export default function AdminPage() {
           </table>
         )}
       </div>
-      {/* Versión móvil simplificada */}
+
       <div className="md:hidden space-y-4">
         {usersList.length === 0 ? (
           <div className={cardClasses}><p className="text-slate-400 text-center py-6">{emptyMessage}</p></div>
@@ -212,10 +295,32 @@ export default function AdminPage() {
                 <div>
                   <p className="font-semibold text-white">{user.name} {user.lastName}</p>
                   <p className="text-sm text-slate-400">{user.email}</p>
+                  
+                  {user.role === 'alumno' && (
+                    <span className={`inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium border ${
+                      user.paymentStatus === 'pagado' 
+                        ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-slate-500/15 text-slate-400 border-slate-500/30'
+                    }`}>
+                      {user.paymentStatus === 'pagado' ? '💳 Pagado' : '🎁 Free'}
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-2">
-                  <Link href={`/admin/edit-user/${user._id}`} className="bg-amber-600/90 text-white px-3 py-1 rounded text-xs">Editar</Link>
-                  <button onClick={() => handleDeleteUser(user._id)} className="bg-rose-600/90 text-white px-3 py-1 rounded text-xs">Eliminar</button>
+                <div className="flex flex-col gap-2">
+                  {user.role === 'alumno' && (
+                    <button 
+                      onClick={() => handleUpdatePaymentStatus(user._id, user.paymentStatus || 'free')}
+                      className="bg-violet-600/90 text-white px-3 py-1 rounded text-xs"
+                    >
+                      Estado
+                    </button>
+                  )}
+                  <Link href={`/admin/edit-user/${user._id}`} className="bg-amber-600/90 text-white px-3 py-1 rounded text-xs text-center">
+                    Editar
+                  </Link>
+                  <button onClick={() => handleDeleteUser(user._id)} className="bg-rose-600/90 text-white px-3 py-1 rounded text-xs">
+                    Eliminar
+                  </button>
                 </div>
               </div>
             </div>
@@ -233,8 +338,6 @@ export default function AdminPage() {
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 mt-40 sm:px-6 py-8">
-        
-        {/* Header con Navegación a Módulos */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-10">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
@@ -244,11 +347,10 @@ export default function AdminPage() {
               Panel de Administración
             </h1>
             <p className="text-slate-400 mt-2 text-sm max-w-xl">
-              Gestiona usuarios y accede a los módulos del Aula Virtual.
+              Gestiona usuarios, estados de pago y accede a los módulos del Aula Virtual.
             </p>
           </div>
           
-          {/* 🔗 ACCESOS RÁPIDOS A MÓDULOS (Aquí iremos construyendo el LMS) */}
           <div className="flex flex-wrap gap-3">
             <Link href="/aula/cursos" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-300 hover:text-white transition-all active:scale-[0.98]">
               <FontAwesomeIcon icon={faChalkboardTeacher} className="w-4 h-4" /> 
@@ -281,7 +383,7 @@ export default function AdminPage() {
               title="Profesores"
               icon={<FontAwesomeIcon icon={faChalkboardTeacher} className="w-5 h-5 text-emerald-400" />}
               roleColor="bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
-              emptyMessage="No hay profesores registrados. ¡Crea uno para empezar a armar cursos!"
+              emptyMessage="No hay profesores registrados."
             />
             <div className="my-8 border-t border-slate-700/50" />
             <UsersTable

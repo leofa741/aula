@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo, FaRegSmile, FaCheckCircle, FaQuoteLeft, FaLightbulb, FaArrowLeft } from 'react-icons/fa';
+import { FaBookOpen, FaPlus, FaSpinner, FaChalkboardTeacher, FaUsers, FaCalendarAlt, FaEdit, FaTrash, FaVideo, FaRegSmile, FaCheckCircle, FaQuoteLeft, FaLightbulb, FaArrowLeft, FaUserPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = {
@@ -37,8 +37,13 @@ export default function CursosPage() {
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
 
-  // 📝 Estado para las notas (clave: studentId ESTABLE)
   const [studentNotes, setStudentNotes] = useState<Record<string, { note: string; isVisibleToStudent: boolean }>>({});
+
+  // ✅ NUEVOS ESTADOS PARA ASIGNAR ALUMNOS
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -69,32 +74,30 @@ export default function CursosPage() {
     if (status === 'authenticated') fetchCourses();
   }, [status]);
 
-
-
-  // 📝 Inicializar notas cuando se abre el modal
+  // ✅ Cargar lista de alumnos y notas cuando se abre el modal
   useEffect(() => {
     if (selectedCourse) {
-      // 👇 AGREGA ESTA LÍNEA: Abre la consola del navegador (F12) y mira qué llega
-      console.log("🔍 DATOS DE ALUMNOS QUE LLEGAN DEL BACKEND:", selectedCourse.students);
+      // 1. Cargar todos los alumnos para el selector
+      fetch('/api/user/students')
+        .then(res => res.json())
+        .then(data => setAllStudents(data.students || []))
+        .catch(err => console.error('Error cargando alumnos:', err));
 
+      // 2. Inicializar notas
       const initialNotes: Record<string, { note: string; isVisibleToStudent: boolean }> = {};
-
       selectedCourse.students?.forEach((student: any) => {
         const studentId = typeof student === 'string'
           ? student
           : (typeof student._id === 'object' && student._id.$oid ? student._id.$oid : String(student._id));
 
         initialNotes[studentId] = {
-          note: student.note || '', // Ahora sí debería tener el texto guardado
+          note: student.note || '',
           isVisibleToStudent: student.isNoteVisible || false
         };
       });
-
       setStudentNotes(initialNotes);
     }
   }, [selectedCourse]);
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,7 +148,6 @@ export default function CursosPage() {
     }
   };
 
-
   const handleEditClick = (course: Course) => {
     setFormData({
       title: course.title,
@@ -190,6 +192,56 @@ export default function CursosPage() {
     }
   };
 
+  // ✅ FUNCIÓN PARA ASIGNAR ALUMNOS AL CURSO
+  const handleAssignStudents = async () => {
+    if (selectedStudentIds.length === 0 || !selectedCourse) return;
+    setIsAssigning(true);
+    
+    try {
+      const res = await fetch(`/api/courses/${selectedCourse._id}/enroll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentIds: selectedStudentIds }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        // Actualizar el modal y la lista principal con los nuevos datos
+        setSelectedCourse(data.course);
+        setCourses(prev => prev.map(c => c._id === selectedCourse._id ? data.course : c));
+        
+        // Limpiar selección
+        setSelectedStudentIds([]);
+        setSearchQuery('');
+        
+        Swal.fire({
+          icon: 'success',
+          title: '¡Alumnos asignados!',
+          text: 'Se ha notificado a los alumnos por correo electrónico.',
+          background: '#0f172a',
+          color: '#f1f5f9',
+          confirmButtonColor: '#8b5cf6',
+          customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+        });
+      } else {
+        throw new Error('Error al asignar');
+      }
+    } catch (error: any) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'No se pudieron asignar los alumnos',
+        background: '#0f172a',
+        color: '#f1f5f9',
+        confirmButtonColor: '#ef4444',
+        customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
+      });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return (
       <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
@@ -200,7 +252,6 @@ export default function CursosPage() {
 
   const canCreate = session?.user?.role === 'admin' || session?.user?.role === 'superadmin' || session?.user?.role === 'profesor';
 
-  // 🔍 FUNCIONES AUXILIARES PARA EXTRAER DATOS DE FORMA SEGURA
   const getStudentId = (student: any) => {
     if (typeof student === 'string') return student;
     if (student._id) return typeof student._id === 'object' && student._id.$oid ? student._id.$oid : String(student._id);
@@ -220,6 +271,13 @@ export default function CursosPage() {
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
 
+  // ✅ Filtrar alumnos que NO están inscritos y que coincidan con la búsqueda
+  const availableStudents = allStudents.filter((student: any) => {
+    const isAlreadyEnrolled = selectedCourse?.students.some((s: any) => getStudentId(s) === student._id);
+    const matchesSearch = `${student.name} ${student.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          student.email.toLowerCase().includes(searchQuery.toLowerCase());
+    return !isAlreadyEnrolled && matchesSearch;
+  });
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
@@ -227,10 +285,9 @@ export default function CursosPage() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto  px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mt-20 mb-8 gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center mt-40 sm:gap-4">
-         
             <a href="/gestion" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm mb-4 sm:mb-0">
               <FaArrowLeft /> Volver a Gestión
             </a>
@@ -253,7 +310,6 @@ export default function CursosPage() {
             </button>
           )}
         </div>
-
 
         {courses.length === 0 ? (
           <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-12 text-center`}>
@@ -302,8 +358,6 @@ export default function CursosPage() {
         )}
       </div>
 
-
-
       {/* ───────── MODAL DE FORMULARIO (CREAR / EDITAR) ───────── */}
       {isFormModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setIsFormModalOpen(false)}>
@@ -341,12 +395,11 @@ export default function CursosPage() {
         </div>
       )}
 
-
-
-      {/* ───────── MODAL DE DETALLES DEL CURSO ───────── */}
+      {/* ───────── MODAL DE DETALLES DEL CURSO (AMPLIADO) ───────── */}
       {selectedCourse && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setSelectedCourse(null)}>
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          {/* ✅ MODAL MÁS GRANDE: max-w-4xl en lugar de max-w-2xl */}
+          <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
             <div className="relative h-32 bg-gradient-to-r from-violet-600 to-fuchsia-600 flex-shrink-0">
               <button onClick={() => setSelectedCourse(null)} className="absolute top-4 right-4 p-2 rounded-full bg-black/20 hover:bg-black/40 text-white transition-colors">✕</button>
               <div className="absolute -bottom-10 left-6 w-20 h-20 rounded-xl bg-slate-800 border-4 border-slate-900 flex items-center justify-center overflow-hidden shadow-lg">
@@ -380,9 +433,7 @@ export default function CursosPage() {
                   <p className="text-sm text-slate-500">{selectedCourse.professor?.email || ''}</p>
                 </div>
 
-
-
-                {/* 📝 SECCIÓN DE ALUMNOS Y NOTAS (LÓGICA ACTUALIZADA) */}
+                {/* 📝 SECCIÓN DE ALUMNOS Y NOTAS */}
                 <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/50 sm:col-span-2">
                   <div className="flex items-center gap-3 mb-4">
                     <FaUsers className="text-fuchsia-400 text-lg" />
@@ -391,15 +442,69 @@ export default function CursosPage() {
                     </span>
                   </div>
 
+                  {/* ✅ NUEVA SECCIÓN: AGREGAR ALUMNOS CON BUSCADOR */}
+                  <div className="pt-4 border-t border-slate-700/50 mb-6">
+                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                      <FaUserPlus className="text-emerald-400" /> Agregar nuevos alumnos al curso
+                    </h3>
+                    
+                    <div className="relative mb-3">
+                      <input 
+                        type="text" 
+                        placeholder="Buscar por nombre o correo..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      />
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar mb-4 border border-slate-800 rounded-lg p-2 bg-slate-950/50">
+                      {availableStudents.length === 0 ? (
+                        <p className="text-xs text-slate-500 text-center py-4">
+                          {searchQuery ? 'No se encontraron alumnos' : 'Todos los alumnos ya están inscritos'}
+                        </p>
+                      ) : (
+                        availableStudents.map((student: any) => (
+                          <label key={student._id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedStudentIds.includes(student._id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedStudentIds([...selectedStudentIds, student._id]);
+                                } else {
+                                  setSelectedStudentIds(selectedStudentIds.filter(id => id !== student._id));
+                                }
+                              }}
+                              className="rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-800 w-4 h-4"
+                            />
+                            <div>
+                              <p className="text-sm text-white font-medium">{student.name} {student.lastName}</p>
+                              <p className="text-xs text-slate-400">{student.email}</p>
+                            </div>
+                          </label>
+                        ))
+                      )}
+                    </div>
+
+                    <button 
+                      onClick={handleAssignStudents}
+                      disabled={isAssigning || selectedStudentIds.length === 0}
+                      className="w-full py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+                    >
+                      {isAssigning ? <FaSpinner className="animate-spin" /> : <FaUserPlus />}
+                      {isAssigning ? 'Asignando y notificando...' : `Asignar ${selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ''} al curso`}
+                    </button>
+                  </div>
+
+                  {/* LISTA DE ALUMNOS INSCRITOS */}
                   {selectedCourse.students && selectedCourse.students.length > 0 ? (
                     <div className="space-y-4 max-h-80 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
                       {selectedCourse.students.map((student: any) => {
-                        // Usamos las funciones auxiliares para garantizar datos estables
                         const studentId = getStudentId(student);
                         const studentName = getStudentName(student);
                         const studentEmail = getStudentEmail(student);
                         const initial = getInitial(studentName);
-
                         const currentNote = studentNotes[studentId] || { note: '', isVisibleToStudent: false };
 
                         return (
@@ -418,30 +523,19 @@ export default function CursosPage() {
                                 Inscrito
                               </span>
                             </div>
-                        
 
-
-                            {/* 📝 SECCIÓN DE NOTA DEL PROFESOR (Diseño Estudiantil Mejorado) */}
                             <div className="mt-6">
                               <div className="relative p-5 rounded-2xl bg-gradient-to-br from-amber-500/5 via-violet-500/5 to-slate-900/50 border border-amber-500/20 backdrop-blur-sm shadow-lg">
-
-                                {/* Badge flotante superior */}
                                 <div className="absolute -top-3.5 left-5 px-3 py-1.5 rounded-full bg-slate-950 border border-amber-500/40 text-amber-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-xl">
-                                  <FaLightbulb className="w-3.5 h-3.5" />
-                                Notas del profesor
+                                  <FaLightbulb className="w-3.5 h-3.5" /> Notas del profesor
                                 </div>
 
                                 {currentNote.note ? (
                                   <div className="mt-3">
-                                    {/* Cita estilizada */}
                                     <div className="relative pl-4 py-1">
                                       <FaQuoteLeft className="absolute -left-1 top-0 w-4 h-4 text-amber-500/30" />
-                                      <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic font-light">
-                                        "{currentNote.note}"
-                                      </p>
+                                      <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic font-light">"{currentNote.note}"</p>
                                     </div>
-
-                                    {/* Footer de la nota */}
                                     <div className="mt-4 pt-3 border-t border-amber-500/10 flex items-center justify-between">
                                       <div className="flex items-center gap-2 text-xs text-slate-500">
                                         <FaCheckCircle className="text-emerald-500 w-3.5 h-3.5" />
@@ -453,7 +547,6 @@ export default function CursosPage() {
                                     </div>
                                   </div>
                                 ) : (
-                                  /* Estado vacío motivador */
                                   <div className="mt-3 text-center py-4">
                                     <FaRegSmile className="mx-auto w-8 h-8 text-slate-600 mb-2" />
                                     <p className="text-slate-300 text-sm font-medium">¡Todo en orden!</p>
@@ -469,12 +562,11 @@ export default function CursosPage() {
                             <div className="space-y-3 pt-3 border-t border-slate-700/50">
                               <div>
                                 <label className="block text-xs font-medium text-slate-400 mb-1.5 flex items-center gap-2">
-                                  📝 ingresar Nota
+                                  📝 Ingresar Nota
                                 </label>
                                 <textarea
                                   value={currentNote.note}
                                   onChange={(e) => {
-                                    // Esta actualización inmutable preserva el foco del teclado
                                     setStudentNotes(prev => ({
                                       ...prev,
                                       [studentId]: {
@@ -529,7 +621,6 @@ export default function CursosPage() {
                                       const data = await res.json();
                                       if (!res.ok) throw new Error(data.error || 'Error al guardar');
 
-                                      // ✅ 1. Actualizar el estado del curso seleccionado (para que el modal refleje el cambio al instante)
                                       setSelectedCourse(prev => {
                                         if (!prev) return null;
                                         return {
@@ -543,7 +634,6 @@ export default function CursosPage() {
                                         };
                                       });
 
-                                      // ✅ 2. Actualizar también la lista general de cursos (para consistencia global)
                                       setCourses(prevCourses =>
                                         prevCourses.map(course =>
                                           course._id === selectedCourse._id
@@ -587,9 +677,6 @@ export default function CursosPage() {
                                 >
                                   💾 Guardar
                                 </button>
-
-
-
                               </div>
                             </div>
                           </div>
@@ -605,17 +692,12 @@ export default function CursosPage() {
                 </div>
               </div>
 
-              {/* Reemplaza o agrega este bloque de botones al final del modal de detalles del profesor */}
               {canCreate && (
                 <div className="flex flex-wrap justify-end gap-3 pt-4 border-t border-slate-800">
-
-                  {/* ✅ NUEVO BOTÓN: INICIAR CLASE EN VIVO (Solo para el profesor) */}
                   <button
                     onClick={() => {
                       const roomName = `AulaVirtual-${selectedCourse.title.replace(/\s+/g, '-')}-${selectedCourse._id}`;
                       const jitsiUrl = `https://meet.jit.si/${roomName}#config.startWithAudioMuted=true&config.startWithVideoMuted=true&userInfo.displayName=${encodeURIComponent(session?.user?.name || 'Profesor')}`;
-
-                      // Copiar el enlace al portapapeles
                       navigator.clipboard.writeText(jitsiUrl).then(() => {
                         Swal.fire({
                           icon: 'success',
@@ -626,7 +708,6 @@ export default function CursosPage() {
                           confirmButtonColor: '#ef4444',
                           customClass: { popup: 'border border-slate-700/50 rounded-2xl' }
                         });
-                        // Abrir la clase para el profesor
                         window.open(jitsiUrl, '_blank');
                       });
                     }}

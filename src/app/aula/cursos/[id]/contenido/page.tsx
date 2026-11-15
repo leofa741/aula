@@ -20,6 +20,7 @@ interface Module {
   content: string;
   type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
   assignmentFileUrl?: string;
+  assignmentFiles?: { url: string; fileName: string; fileType: string }[];
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: string[];
@@ -89,7 +90,9 @@ export default function CursoContenidoPage() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [customGroupName, setCustomGroupName] = useState('');
 
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [existingFiles, setExistingFiles] = useState<any[]>([]);
+  
   const [submitting, setSubmitting] = useState(false);
   const [editingModuleOrder, setEditingModuleOrder] = useState<string | null>(null);
 
@@ -209,7 +212,11 @@ export default function CursoContenidoPage() {
     setAssignmentType(module.assignmentType || 'todos');
     setSelectedStudentIds(module.assignedStudentIds?.map(String) || []);
     setCustomGroupName(module.customGroupName || '');
-    setFileToUpload(null);
+    
+    const files = (module as any).assignmentFiles || [];
+    setExistingFiles(files);
+    setSelectedFiles([]);
+    
     setEditingModuleOrder(orderStr);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -233,7 +240,8 @@ export default function CursoContenidoPage() {
         if (res.ok) {
           if (editingModuleOrder === orderStr) {
             setFormData({ title: '', description: '', content: '', type: 'texto' });
-            setFileToUpload(null);
+            setSelectedFiles([]);
+            setExistingFiles([]);
             setEditingModuleOrder(null);
             setAssignmentType('todos');
             setSelectedStudentIds([]);
@@ -248,7 +256,6 @@ export default function CursoContenidoPage() {
     }
   };
 
-  // ✅ FUNCIÓN EXPLÍCITA PARA MANEJAR LA SELECCIÓN DE ALUMNOS
   const handleStudentSelection = (studentId: string, isChecked: boolean) => {
     if (isChecked) {
       setSelectedStudentIds(prev => [...prev, studentId]);
@@ -263,54 +270,49 @@ export default function CursoContenidoPage() {
 
     try {
       let finalContent = formData.content;
-      let assignmentFileUrl = '';
 
-      if ((formData.type === 'actividad' || formData.type === 'pdf' || formData.type === 'comprimido') && !editingModuleOrder && !fileToUpload) {
-        throw new Error('Debes seleccionar un archivo para este tipo de módulo.');
+      if ((formData.type === 'actividad' || formData.type === 'pdf' || formData.type === 'comprimido') && !editingModuleOrder && selectedFiles.length === 0 && existingFiles.length === 0) {
+        throw new Error('Debes seleccionar al menos un archivo para este tipo de módulo.');
       }
 
-      if ((formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') && fileToUpload) {
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', fileToUpload);
+      let finalFiles = [...existingFiles];
 
-        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
-        if (!uploadRes.ok) throw new Error('Error al subir el archivo');
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
 
-        const uploadData = await uploadRes.json();
-        if (formData.type === 'actividad') {
-          assignmentFileUrl = uploadData.url;
-        } else {
-          finalContent = uploadData.url;
+          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
+          if (!uploadRes.ok) throw new Error(`Error al subir el archivo: ${file.name}`);
+
+          const uploadData = await uploadRes.json();
+          finalFiles.push({
+            url: uploadData.url,
+            fileName: uploadData.fileName || file.name,
+            fileType: file.name.split('.').pop()?.toLowerCase() || 'file'
+          });
         }
       }
 
       if (!finalContent || finalContent.trim() === '') {
-        finalContent = 'Archivo adjunto al módulo';
+        finalContent = 'Archivos adjuntos al módulo';
       }
 
-      // ✅ LÓGICA DE ASIGNACIÓN INFALIBLE
       let finalAssignmentType = assignmentType;
-      
-      // Si el usuario marcó alumnos pero olvidó cambiar el dropdown de "todos", lo corregimos
       if (selectedStudentIds.length > 0 && assignmentType === 'todos') {
         finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
-      } 
-      // Si no hay alumnos seleccionados, forzamos que sea para "todos"
-      else if (selectedStudentIds.length === 0) {
+      } else if (selectedStudentIds.length === 0) {
         finalAssignmentType = 'todos';
       }
 
       const payload = {
         ...formData,
         content: finalContent,
-        assignmentFileUrl,
+        assignmentFiles: finalFiles,
         assignmentType: finalAssignmentType,
         assignedStudentIds: (finalAssignmentType === 'especificos' || finalAssignmentType === 'grupo') ? selectedStudentIds : [],
         customGroupName: finalAssignmentType === 'grupo' ? customGroupName : undefined,
       };
-
-      // 🔍 DEPURACIÓN: Esto te mostrará en la consola del navegador EXACTAMENTE qué se envía
-      console.log("🚀 PAYLOAD ENVIADO AL BACKEND:", JSON.stringify(payload, null, 2));
 
       const url = editingModuleOrder
         ? `/api/courses/${courseId}/modules/${editingModuleOrder}`
@@ -327,7 +329,8 @@ export default function CursoContenidoPage() {
 
       if (res.ok) {
         setFormData({ title: '', description: '', content: '', type: 'texto' });
-        setFileToUpload(null);
+        setSelectedFiles([]);
+        setExistingFiles([]);
         setEditingModuleOrder(null);
         setAssignmentType('todos');
         setSelectedStudentIds([]);
@@ -410,7 +413,7 @@ export default function CursoContenidoPage() {
                     >
                       <option value="texto">📝 Texto / Instrucciones</option>
                       <option value="video">🎥 Enlace de Video (YouTube/Vimeo)</option>
-                      <option value="pdf">📄 Subir Archivo PDF</option>
+                      <option value="pdf">📄 Subir Archivo PDF (Entregable)</option>
                       <option value="comprimido">📦 Archivo Comprimido (ZIP/RAR)</option>
                       <option value="enlace">🔗 Enlace Externo</option>
                       <option value="actividad">📚 Actividad / Entrega (Requiere tarea del alumno)</option>
@@ -475,23 +478,68 @@ export default function CursoContenidoPage() {
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
-                      {formData.type === 'texto' ? 'Contenido (Texto)' : (formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') ? 'Archivo *' : 'URL del Contenido *'}
-                    </label>
-
-                    {(formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') ? (
+                  {(formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') && (
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+                        Archivos de la consigna *
+                      </label>
                       <input
                         type="file"
+                        multiple
                         accept=".pdf,.doc,.docx,.zip,.rar,.7z"
-                        onChange={(e) => setFileToUpload(e.target.files?.[0] || null)}
-                        required={!editingModuleOrder}
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            const filesArray: File[] = [];
+                            for (let i = 0; i < e.target.files.length; i++) {
+                              filesArray.push(e.target.files[i]);
+                            }
+                            setSelectedFiles(prev => [...prev, ...filesArray]);
+                          }
+                        }}
                         className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500"
                       />
-                    ) : (
-                      <textarea value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm resize-none" placeholder={formData.type === 'texto' ? 'Escribe las instrucciones o el contenido aquí...' : 'Ej: https://youtube.com/watch?v=...'} />
-                    )}
-                  </div>
+                      
+                      {existingFiles.length > 0 && (
+                        <div className="mt-2 mb-2">
+                          <p className="text-[10px] text-slate-500 uppercase mb-1">Archivos ya guardados:</p>
+                          {existingFiles.map((file, idx) => (
+                            <div key={`exist-${idx}`} className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg text-xs mb-1">
+                              <span className="text-emerald-400 truncate flex-1 flex items-center gap-2">
+                                <FaCheckCircle className="w-3 h-3" /> {file.fileName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setExistingFiles(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
+                              >
+                                <FaTrash className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {selectedFiles.length > 0 && (
+                        <div className="space-y-2 mt-3">
+                          <p className="text-[10px] text-slate-500 uppercase">Nuevos archivos a subir:</p>
+                          {selectedFiles.map((file, idx) => (
+                            <div key={`new-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-sm">
+                              <span className="text-slate-300 truncate flex-1 flex items-center gap-2">
+                                <FaFileAlt className="text-violet-400" /> {file.name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
+                                className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
+                              >
+                                <FaTrash className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Descripción Corta (Opcional)</label>
@@ -505,9 +553,10 @@ export default function CursoContenidoPage() {
                     </button>
 
                     {editingModuleOrder && (
-                      <button type="button" onClick={() => {
-                        setFormData({ title: '', description: '', content: '', type: 'texto' });
-                        setFileToUpload(null);
+                      <button type="button" onClick={() => { 
+                        setFormData({ title: '', description: '', content: '', type: 'texto' }); 
+                        setSelectedFiles([]);
+                        setExistingFiles([]);
                         setEditingModuleOrder(null);
                         setAssignmentType('todos');
                         setSelectedStudentIds([]);
@@ -578,19 +627,27 @@ export default function CursoContenidoPage() {
 
                           {(moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido') && (
                             <div className="mt-4 space-y-4">
-                              {(moduleType === 'pdf' || moduleType === 'comprimido') && !module.assignmentFileUrl && (
-                                <a href={getProxyDownloadUrl(module.content, module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf'))} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all text-sm font-semibold">
-                                  <FaDownload className="w-4 h-4" /> Descargar Archivo
-                                </a>
-                              )}
+                              {(() => {
+                                const filesToDownload = (module as any).assignmentFiles && (module as any).assignmentFiles.length > 0
+                                  ? (module as any).assignmentFiles
+                                  : (module.assignmentFileUrl ? [{ url: module.assignmentFileUrl, fileName: module.title, fileType: 'file' }] : []);
 
-                              {module.assignmentFileUrl && (
-                                <a href={getProxyDownloadUrl(module.assignmentFileUrl, module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf'))} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold">
-                                  <FaDownload className="w-4 h-4" /> Descargar Consigna / Archivo
-                                </a>
-                              )}
+                                return filesToDownload.map((file: any, idx: number) => (
+                                  <a
+                                    key={idx}
+                                    href={getProxyDownloadUrl(file.url, file.fileName)}
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link w-full sm:w-auto"
+                                  >
+                                    <FaDownload className="w-4 h-4" />
+                                    {file.fileType === 'zip' || file.fileType === 'rar' || file.fileType === '7z' 
+                                      ? 'Descargar Archivo Comprimido' 
+                                      : `Descargar: ${file.fileName}`}
+                                  </a>
+                                ));
+                              })()}
 
-                              {(moduleType === 'actividad' || moduleType === 'comprimido') && isProfessor && (
+                              {/* ✅ CAMBIO CLAVE: Ahora incluye 'pdf' junto a 'actividad' y 'comprimido' */}
+                              {(moduleType === 'actividad' || moduleType === 'comprimido' || moduleType === 'pdf') && isProfessor && (
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                                   <button onClick={() => fetchSubmissions(moduleIdStr)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
                                     <FaSpinner className={`w-3 h-3 ${loadingSubmissions ? 'animate-spin' : ''}`} />

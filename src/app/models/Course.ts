@@ -1,14 +1,23 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+// ✅ 1. NUEVA INTERFAZ PARA LOS ARCHIVOS ADJUNTOS
+export interface IModuleFile {
+  url: string;
+  fileName: string;
+  fileType: string;
+}
+
 export interface IModule {
   title: string;
   description: string;
-  content?: string; // Ahora opcional, una actividad puede solo tener archivo
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido'; // Agregado 'comprimido' como tipo válido
-  assignmentFileUrl?: string; // URL del archivo de consigna subido por el profesor
+  content?: string;
+  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
+  
+  // ✅ 2. CAMPOS DE ARCHIVOS (Nuevo array + campo antiguo por compatibilidad)
+  assignmentFiles?: IModuleFile[]; 
+  assignmentFileUrl?: string; 
+  
   order: number;
-
-  // ✅ NUEVOS CAMPOS PARA ASIGNACIÓN DE ACTIVIDADES
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: mongoose.Types.ObjectId[];
   customGroupName?: string;
@@ -27,18 +36,28 @@ export interface ICourse extends Document {
   updatedAt: Date;
 }
 
+// ✅ 3. SCHEMA PARA EL ARCHIVO INDIVIDUAL
+const ModuleFileSchema = new Schema<IModuleFile>({
+  url: { type: String, required: true },
+  fileName: { type: String, required: true },
+  fileType: { type: String, required: true }
+}, { _id: false });
+
 const ModuleSchema = new Schema<IModule>({
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  content: { type: String, default: '' }, // Cambiado a default ''
+  content: { type: String, default: '' },
   type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad', 'comprimido'], default: 'texto' },
-  assignmentFileUrl: { type: String, default: '' },
+  
+  // ✅ 4. ACTUALIZAR SCHEMA DEL MÓDULO
+  assignmentFiles: { type: [ModuleFileSchema], default: [] },
+  assignmentFileUrl: { type: String, default: '' }, // Mantenido por compatibilidad
+  
   order: { type: Number, required: true },
   assignmentType: { type: String, enum: ['todos', 'especificos', 'grupo'], default: 'todos' },
   assignedStudentIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   customGroupName: { type: String, default: '' }
-
-}, { _id: false }); // Mantenemos _id: false para compatibilidad con tu BD actual
+}, { _id: false });
 
 const CourseSchema = new Schema<ICourse>(
   {
@@ -67,6 +86,7 @@ CourseSchema.pre('save', function (next) {
   }
   next();
 });
+
 
 const Course = mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
 export default Course;

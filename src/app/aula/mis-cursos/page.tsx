@@ -22,6 +22,7 @@ interface Course {
   professor: { name: string };
 }
 
+
 export default function MisCursosPage() {
   const { data: session, status } = useSession();
   const router = useRouter();

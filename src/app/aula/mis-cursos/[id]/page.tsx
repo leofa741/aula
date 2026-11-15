@@ -18,6 +18,7 @@ const theme = {
   textSecondary: 'text-slate-400',
 };
 
+// ✅ ACTUALIZAR INTERFAZ PARA INCLUIR EL ARRAY DE ARCHIVOS
 interface Module {
   _id?: string;
   id?: string;
@@ -26,8 +27,8 @@ interface Module {
   content: string;
   type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
   assignmentFileUrl?: string;
+  assignmentFiles?: { url: string; fileName: string; fileType: string }[]; // ✅ NUEVO
   order: number;
-  // ✅ Campos necesarios para el filtro de visibilidad
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: string[];
   customGroupName?: string;
@@ -49,6 +50,7 @@ const getProxyDownloadUrl = (url: string, filename: string) => {
 };
 
 export default function StudentCourseDetailPage() {
+  // ... (todo el estado y los useEffects se mantienen EXACTAMENTE IGUAL que en tu código) ...
   const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
@@ -74,18 +76,12 @@ export default function StudentCourseDetailPage() {
           const data = await res.json();
           setCourseTitle(data.courseTitle);
           
-          // ✅ FILTRO DE VISIBILIDAD DE MÓDULOS
           const studentId = session?.user?.id;
           const visibleModules = (data.modules || []).filter((module: any) => {
-            // 1. Si es para todos, es visible
             if (module.assignmentType === 'todos') return true;
-            
-            // 2. Si es para específicos o grupo, verificamos si el ID del alumno está en la lista
             if (module.assignmentType === 'especificos' || module.assignmentType === 'grupo') {
               return module.assignedStudentIds?.includes(studentId);
             }
-            
-            // 3. Por defecto (módulos antiguos sin esta configuración), los mostramos
             return true;
           });
 
@@ -101,7 +97,6 @@ export default function StudentCourseDetailPage() {
       }
     };
 
-    // ✅ Agregamos session?.user?.id a las dependencias para que se ejecute cuando tengamos el usuario
     if (status === 'authenticated' && courseId && session?.user?.id) {
       fetchCourseData();
     }
@@ -132,21 +127,16 @@ export default function StudentCourseDetailPage() {
     }
   }, [status, courseId, modules]);
 
-  // 🔒 LÓGICA DEL CANDADO INTELIGENTE
   const isModuleLocked = (currentOrder: number): boolean => {
     if (currentOrder === 1) return false;
-
     for (let i = currentOrder - 1; i >= 1; i--) {
       const prevModule = modules.find(m => m.order === i);
       if (prevModule) {
         const prevModuleType = prevModule.type ? String(prevModule.type).toLowerCase().trim() : 'texto';
         const isPrevAssignment = prevModuleType === 'actividad' || prevModuleType === 'pdf' || prevModuleType === 'comprimido';
-        
         if (isPrevAssignment) {
           const prevSubmission = submissions[String(i)];
-          if (!prevSubmission || prevSubmission.status !== 'aprobado') {
-            return true;
-          }
+          if (!prevSubmission || prevSubmission.status !== 'aprobado') return true;
         }
       }
     }
@@ -159,12 +149,9 @@ export default function StudentCourseDetailPage() {
       if (prevModule) {
         const prevModuleType = prevModule.type ? String(prevModule.type).toLowerCase().trim() : 'texto';
         const isPrevAssignment = prevModuleType === 'actividad' || prevModuleType === 'pdf' || prevModuleType === 'comprimido';
-        
         if (isPrevAssignment) {
           const prevSubmission = submissions[String(i)];
-          if (!prevSubmission || prevSubmission.status !== 'aprobado') {
-            return i;
-          }
+          if (!prevSubmission || prevSubmission.status !== 'aprobado') return i;
         }
       }
     }
@@ -245,8 +232,8 @@ export default function StudentCourseDetailPage() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-500/10 via-violet-500/10 to-fuchsia-500/10 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto mt-40 px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center gap-4 mb-8">
+      <div className="relative z-10 max-w-6xl mx-autopx-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex items-center  mt-40  gap-4 mb-8">
           <button onClick={() => router.push('/aula/mis-cursos')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
             <FaArrowLeft />
           </button>
@@ -369,13 +356,25 @@ export default function StudentCourseDetailPage() {
 
                               {isAssignment ? (
                                 <div className="mt-3 space-y-3">
-                                  <a
-                                    href={getProxyDownloadUrl(module.assignmentFileUrl || module.content, module.title + (moduleType === 'comprimido' ? '.zip' : '.pdf'))}
-                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link"
-                                  >
-                                    <FaDownload className="w-4 h-4" />
-                                    {moduleType === 'comprimido' ? 'Descargar Archivo Comprimido' : 'Descargar Material / Consigna'}
-                                  </a>
+                                  {/* ✅ LÓGICA RETROCOMPATIBLE PARA OBTENER LOS ARCHIVOS */}
+                                  {(() => {
+                                    const filesToDownload = (module as any).assignmentFiles && (module as any).assignmentFiles.length > 0
+                                      ? (module as any).assignmentFiles
+                                      : (module.assignmentFileUrl ? [{ url: module.assignmentFileUrl, fileName: module.title, fileType: 'file' }] : []);
+
+                                    return filesToDownload.map((file: any, idx: number) => (
+                                      <a
+                                        key={idx}
+                                        href={getProxyDownloadUrl(file.url, file.fileName)}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link w-full sm:w-auto"
+                                      >
+                                        <FaDownload className="w-4 h-4" />
+                                        {file.fileType === 'zip' || file.fileType === 'rar' || file.fileType === '7z' 
+                                          ? 'Descargar Archivo Comprimido' 
+                                          : `Descargar: ${file.fileName}`}
+                                      </a>
+                                    ));
+                                  })()}
 
                                   {mySubmission ? (
                                     <div className="p-4 rounded-lg bg-slate-950/50 border border-slate-800 space-y-3">

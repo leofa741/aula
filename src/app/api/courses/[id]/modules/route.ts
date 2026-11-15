@@ -34,10 +34,11 @@ export async function POST(
 
     const body = await req.json();
     
-    // ✅ NUEVO: Extraemos los campos de asignación del body
+    // ✅ CORRECCIÓN: Extraemos assignmentFiles del body
     const { 
       title, description, content, type, assignmentFileUrl, 
-      assignmentType, assignedStudentIds, customGroupName 
+      assignmentType, assignedStudentIds, customGroupName,
+      assignmentFiles // <-- ¡ESTO FALTABA!
     } = body;
 
     if (!title) {
@@ -52,13 +53,14 @@ export async function POST(
       ? Math.max(...course.modules.map((m: any) => m.order)) + 1 
       : 1;
 
-    // ✅ NUEVO: Guardamos los campos de asignación en el nuevo módulo
+    // ✅ CORRECCIÓN: Guardamos assignmentFiles en el nuevo módulo
     course.modules.push({
       title,
       description: description || '',
       content: content || '',
       type: type || 'texto',
       assignmentFileUrl: assignmentFileUrl || '', 
+      assignmentFiles: assignmentFiles || [], // <-- ¡ESTO FALTABA!
       order: nextOrder,
       assignmentType: assignmentType || 'todos',
       assignedStudentIds: assignedStudentIds || [],
@@ -67,7 +69,7 @@ export async function POST(
 
     await course.save();
 
-    // 📧 Notificar a los alumnos (tu código original intacto)
+    // 📧 Notificar a los alumnos
     try {
       const origin = req.nextUrl.origin;
       const classroomUrl = `${origin}/aula/cursos/${courseId}`;
@@ -172,10 +174,11 @@ export async function PUT(
 
     const body = await req.json();
     
-    // ✅ NUEVO: Extraemos los campos de asignación del body
+    // ✅ CORRECCIÓN: Extraemos assignmentFiles del body
     const { 
       title, description, content, type, assignmentFileUrl,
-      assignmentType, assignedStudentIds, customGroupName
+      assignmentType, assignedStudentIds, customGroupName,
+      assignmentFiles // <-- ¡ESTO FALTABA!
     } = body;
 
     if (!title) {
@@ -192,13 +195,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
     }
 
-    // ✅ NUEVO: Actualizamos los campos de asignación
+    // ✅ CORRECCIÓN: Actualizamos assignmentFiles
     module.title = title;
     module.description = description || '';
     module.content = content || '';
     module.type = type || 'texto';
     
     if (assignmentFileUrl !== undefined) module.assignmentFileUrl = assignmentFileUrl;
+    if (assignmentFiles !== undefined) module.assignmentFiles = assignmentFiles; // <-- ¡ESTO FALTABA!
     if (assignmentType !== undefined) module.assignmentType = assignmentType;
     if (assignedStudentIds !== undefined) module.assignedStudentIds = assignedStudentIds;
     if (customGroupName !== undefined) module.customGroupName = customGroupName;

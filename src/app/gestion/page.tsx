@@ -11,7 +11,8 @@ import {
   FaClipboardCheck,
   FaCog,
   FaArrowRight,
-  FaUserGraduate
+  FaUserGraduate,
+  FaCalendarAlt // ✅ 1. Agregamos el ícono del calendario
 } from 'react-icons/fa';
 
 const theme = {
@@ -40,10 +41,11 @@ function ModuleCard({ title, description, icon, href, color, available }: Module
   return (
     <Link
       href={available ? href : '#'}
-      className={`group relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 ${available
+      className={`group relative flex flex-col p-6 rounded-2xl border backdrop-blur-sm transition-all duration-300 ${
+        available
           ? `${theme.bgCard} ${theme.border} hover:border-violet-500/50 hover:bg-slate-800/90 hover:-translate-y-1 hover:shadow-xl hover:shadow-violet-900/20`
           : 'bg-slate-900/40 border-slate-800 opacity-60 cursor-not-allowed'
-        }`}
+      }`}
     >
       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
         {icon}
@@ -134,7 +136,7 @@ export default function PanelGestionPage() {
       href: "/admin",
       color: "from-violet-600 to-fuchsia-600",
       available: true,
-      roles: ["admin", "superadmin"] // 👈 Solo admins
+      roles: ["admin", "superadmin"]
     },
     {
       title: "Cursos y Materias",
@@ -143,7 +145,7 @@ export default function PanelGestionPage() {
       href: "/aula/cursos",
       color: "from-emerald-600 to-teal-600",
       available: true,
-      roles: ["admin", "superadmin", "profesor"] // 👈 Admins y Profesores
+      roles: ["admin", "superadmin", "profesor"]
     },
     {
       title: "Mis Cursos",
@@ -152,7 +154,17 @@ export default function PanelGestionPage() {
       href: "/aula/mis-cursos",
       color: "from-emerald-600 to-teal-600",
       available: true,
-      roles: ["alumno", "profesor", "admin", "superadmin"] // 👈 Todos, pero principal para alumnos
+      roles: ["alumno", "profesor", "admin", "superadmin"]
+    },
+    // ✅ 2. NUEVO MÓDULO: CALENDARIO
+    {
+      title: "Calendario de Clases",
+      description: "Visualiza y agenda clases en vivo, reuniones y fechas importantes de tus cursos.",
+      icon: <FaCalendarAlt className="w-6 h-6" />,
+      href: "/aula/calendario",
+      color: "from-violet-600 to-fuchsia-600",
+      available: true,
+      roles: ["alumno", "profesor", "admin", "superadmin"] // 👈 Visible para todos los roles
     },
     {
       title: "Catálogo de Cursos",
@@ -161,7 +173,7 @@ export default function PanelGestionPage() {
       href: "/aula/cursos-disponibles",
       color: "from-blue-600 to-indigo-600",
       available: true,
-      roles: ["alumno"] // 👈 Principalmente para alumnos
+      roles: ["alumno"]
     },
     {
       title: "Ide y Compilador en la Nube",
@@ -178,7 +190,7 @@ export default function PanelGestionPage() {
       icon: <FaClipboardCheck className="w-6 h-6" />,
       href: "/aula/tareas",
       color: "from-amber-500 to-orange-600",
-      available: false, // En construcción
+      available: false,
       roles: ["alumno", "profesor", "admin", "superadmin"]
     },
     {
@@ -187,8 +199,8 @@ export default function PanelGestionPage() {
       icon: <FaCog className="w-6 h-6" />,
       href: "/gestion/configuracion",
       color: "from-slate-600 to-slate-700",
-      available: false, // En construcción
-      roles: ["admin", "superadmin"] // 👈 Solo admins
+      available: false,
+      roles: ["admin", "superadmin"]
     }
   ];
 
@@ -206,7 +218,7 @@ export default function PanelGestionPage() {
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-cyan-500/20 via-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4  sm:px-6 lg:px-8 py-12 sm:py-20">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
 
         {/* Header del Dashboard */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">

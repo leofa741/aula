@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
+
 // ✅ PUT - Actualizar un usuario (solo admin)
 export async function PUT(req: NextRequest) {
   try {
@@ -68,16 +69,24 @@ export async function PUT(req: NextRequest) {
     if (!id) return NextResponse.json({ message: 'ID de usuario requerido' }, { status: 400 });
 
     const formData = await req.formData();
-    const name = formData.get('name')?.toString().trim() || '';
-    const lastName = formData.get('lastName')?.toString().trim() || '';
-    const address = formData.get('address')?.toString().trim() || '';   // ✅
-    const city = formData.get('city')?.toString().trim() || '';         // ✅
-    const zipCode = formData.get('zipCode')?.toString().trim() || '';   // ✅
-    const phone = formData.get('phone')?.toString().trim() || '';
-    const role = formData.get('role')?.toString().trim() || '';
-    const imgFile = formData.get('img') as File | null;
+    
+    // ✅ CORRECCIÓN: Solo agregamos al objeto de actualización los campos que realmente vienen en la petición
+    const updateData: any = {};
 
-    let imgUrl = null;
+    if (formData.has('name')) updateData.name = formData.get('name')?.toString().trim();
+    if (formData.has('lastName')) updateData.lastName = formData.get('lastName')?.toString().trim();
+    if (formData.has('address')) updateData.address = formData.get('address')?.toString().trim();
+    if (formData.has('city')) updateData.city = formData.get('city')?.toString().trim();
+    if (formData.has('zipCode')) updateData.zipCode = formData.get('zipCode')?.toString().trim();
+    if (formData.has('phone')) updateData.phone = formData.get('phone')?.toString().trim();
+    if (formData.has('role')) updateData.role = formData.get('role')?.toString().trim();
+    
+    // ✅ EXTRAER EL NUEVO ESTADO DE PAGO (Solo si viene en la petición)
+    if (formData.has('paymentStatus')) {
+      updateData.paymentStatus = formData.get('paymentStatus')?.toString() as 'free' | 'pagado';
+    }
+    
+    const imgFile = formData.get('img') as File | null;
     if (imgFile && imgFile.size > 0) {
       const arrayBuffer = await imgFile.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
@@ -90,22 +99,12 @@ export async function PUT(req: NextRequest) {
           }
         ).end(buffer);
       });
-      imgUrl = (result as CloudinaryUploadResult).secure_url;
+      updateData.img = (result as any).secure_url;
     }
 
-    // ✅ Incluir TODOS los campos que se deben actualizar
-    const updateData: any = {
-      name,
-      lastName,
-      address,      // ✅
-      city,         // ✅
-      zipCode,      // ✅
-      phone,
-      role,
-    };
-
-    if (imgUrl) {
-      updateData.img = imgUrl;
+    // Verificar que haya al menos un campo para actualizar
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ message: 'No hay datos válidos para actualizar' }, { status: 400 });
     }
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -122,6 +121,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ message: 'Error al actualizar el usuario' }, { status: 500 });
   }
 }
+
+
 // ✅ DELETE - Eliminar un usuario (solo admin)
 export async function DELETE(req: NextRequest) {
   try {

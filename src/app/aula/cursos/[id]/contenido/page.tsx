@@ -277,19 +277,29 @@ export default function CursoContenidoPage() {
 
       let finalFiles = [...existingFiles];
 
+      // ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: SUBIDA DIRECTA A CLOUDINARY
       if (selectedFiles.length > 0) {
         for (const file of selectedFiles) {
-          const formDataUpload = new FormData();
-          formDataUpload.append('file', file);
+          const cloudinaryFormData = new FormData();
+          cloudinaryFormData.append('file', file);
+          cloudinaryFormData.append('upload_preset', 'aula_virtual_uploads'); // Tu preset Unsigned
+          cloudinaryFormData.append('cloud_name', 'dvswogrex'); // Tu Cloud Name
 
-          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
-          if (!uploadRes.ok) throw new Error(`Error al subir el archivo: ${file.name}`);
+          const uploadRes = await fetch('https://api.cloudinary.com/v1_1/dvswogrex/auto/upload', {
+            method: 'POST',
+            body: cloudinaryFormData,
+          });
+
+          if (!uploadRes.ok) {
+            const errorData = await uploadRes.json();
+            throw new Error(errorData.error?.message || `Error al subir el archivo: ${file.name}`);
+          }
 
           const uploadData = await uploadRes.json();
           finalFiles.push({
-            url: uploadData.url,
-            fileName: uploadData.fileName || file.name,
-            fileType: file.name.split('.').pop()?.toLowerCase() || 'file'
+            url: uploadData.secure_url, // Cloudinary devuelve la URL segura
+            fileName: uploadData.original_filename || file.name,
+            fileType: uploadData.resource_type || file.name.split('.').pop()?.toLowerCase() || 'file'
           });
         }
       }
@@ -646,7 +656,6 @@ export default function CursoContenidoPage() {
                                 ));
                               })()}
 
-                              {/* ✅ CAMBIO CLAVE: Ahora incluye 'pdf' junto a 'actividad' y 'comprimido' */}
                               {(moduleType === 'actividad' || moduleType === 'comprimido' || moduleType === 'pdf') && isProfessor && (
                                 <div className="mt-4 pt-4 border-t border-slate-700/50">
                                   <button onClick={() => fetchSubmissions(moduleIdStr)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">

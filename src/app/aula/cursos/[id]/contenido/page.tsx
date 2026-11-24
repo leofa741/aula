@@ -3,24 +3,18 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaFilePdf, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaFileWord, FaCheckCircle, FaTimesCircle, FaDownload, FaFileArchive, FaUsers, FaLayerGroup, FaKey } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaPlus, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaCheckCircle, FaTimesCircle, FaUsers, FaLayerGroup, FaLink } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
-const theme = {
-  bg: 'bg-slate-950',
-  bgCard: 'bg-slate-900/80',
-  border: 'border-slate-700/50',
-  textPrimary: 'text-white',
-  textSecondary: 'text-slate-400',
-};
+const theme = { bg: 'bg-slate-950', bgCard: 'bg-slate-900/80', border: 'border-slate-700/50', textPrimary: 'text-white', textSecondary: 'text-slate-400' };
 
 interface Module {
+  _id?: string;
   title: string;
   description: string;
   content: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
-  assignmentFileUrl?: string;
-  assignmentFiles?: { url: string; fileName: string; fileType: string }[];
+  links: string[];
+  type: 'texto' | 'video' | 'enlace';
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: string[];
@@ -29,38 +23,19 @@ interface Module {
 
 interface Submission {
   _id: string;
-  studentId: string;
+  studentId: any;
   studentName: string;
   studentEmail: string;
-  fileUrl: string;
-  fileName: string;
+  deliveryLink: string;
   status: 'pendiente' | 'aprobado' | 'rechazado';
   feedback?: string;
   submittedAt: string;
 }
 
-const getStudentId = (student: any) => {
-  if (typeof student === 'string') return student;
-  if (student._id) return typeof student._id === 'object' && student._id.$oid ? student._id.$oid : String(student._id);
-  return `fallback-${Math.random()}`;
-};
-
+const getStudentId = (student: any) => typeof student === 'string' ? student : (student._id?.$oid ? student._id.$oid : String(student._id));
 const getStudentName = (student: any) => {
   if (typeof student === 'string') return `Alumno (ID: ${student.slice(0, 6)}...)`;
-  const fullName = `${student.name || ''} ${student.lastName || ''}`.trim();
-  return fullName || student.email || 'Alumno sin nombre';
-};
-
-const formatUrl = (url: string) => {
-  if (!url) return '#';
-  const trimmed = url.trim();
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-  return `https://${trimmed}`;
-};
-
-const getProxyDownloadUrl = (url: string, filename: string) => {
-  if (!url) return '#';
-  return `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+  return `${student.name || ''} ${student.lastName || ''}`.trim() || student.email || 'Alumno';
 };
 
 export default function CursoContenidoPage() {
@@ -72,29 +47,19 @@ export default function CursoContenidoPage() {
   const [mounted, setMounted] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [userRole, setUserRole] = useState<string>('alumno');
-
   const [courseTitle, setCourseTitle] = useState('');
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [courseStudents, setCourseStudents] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    content: '',
-    type: 'texto' as 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido',
+  const [formData, setFormData] = useState({ 
+    title: '', description: '', content: '', type: 'texto' as 'texto' | 'video' | 'enlace', links: [''] 
   });
-
   const [assignmentType, setAssignmentType] = useState<'todos' | 'especificos' | 'grupo'>('todos');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [customGroupName, setCustomGroupName] = useState('');
-
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [existingFiles, setExistingFiles] = useState<any[]>([]);
-  
   const [submitting, setSubmitting] = useState(false);
-  const [editingModuleOrder, setEditingModuleOrder] = useState<string | null>(null);
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
 
   const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
@@ -104,283 +69,147 @@ export default function CursoContenidoPage() {
   useEffect(() => {
     if (status === 'loading' || !mounted) return;
     if (status === 'unauthenticated') { router.push('/login'); return; }
-
-    let role = 'alumno';
-    if (session?.user?.role) {
-      role = session.user.role;
-    } else {
-      const token = localStorage.getItem('token');
-      if (token) {
-        try {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          if (payload.role) role = payload.role;
-        } catch (e) { console.error('Error decodificando token:', e); }
-      }
-    }
-
-    setUserRole(role);
+    setUserRole(session?.user?.role || 'alumno');
     setIsAuthorized(true);
   }, [status, session, router, mounted]);
 
-  const fetchCourseStudents = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch(`/api/courses/${courseId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setCourseStudents(data.course?.students || []);
-      }
-    } catch (error) {
-      console.error('Error cargando alumnos del curso:', error);
-    }
-  };
-
-  const fetchModules = async () => {
-    try {
-      const res = await fetch(`/api/courses/${courseId}/modules`);
-      if (res.ok) {
-        const data = await res.json();
+      const [courseRes, modulesRes] = await Promise.all([
+        fetch(`/api/courses/${courseId}`),
+        fetch(`/api/courses/${courseId}/modules`)
+      ]);
+      if (courseRes.ok) setCourseStudents((await courseRes.json()).course?.students || []);
+      if (modulesRes.ok) {
+        const data = await modulesRes.json();
         setCourseTitle(data.courseTitle);
         setModules(data.modules || []);
-      } else {
-        router.push('/aula/cursos');
       }
-    } catch (error) {
-      console.error('Error cargando módulos:', error);
-    } finally {
-      setLoading(false);
-    }
+    } catch (error) { console.error('Error cargando datos:', error); }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    if (status === 'authenticated' && courseId && isAuthorized) {
-      fetchModules();
-      fetchCourseStudents();
-    }
-  }, [status, courseId, isAuthorized]);
+  useEffect(() => { if (status === 'authenticated' && courseId && isAuthorized) fetchData(); }, [status, courseId, isAuthorized]);
 
-  const fetchSubmissions = async (moduleOrderStr: string, forceRefresh = false) => {
-    if (!forceRefresh && submissions[moduleOrderStr]) return;
+   const fetchSubmissions = async (moduleId: string, forceRefresh = false) => {
+    // 🔒 CORRECCIÓN: La clave de caché ahora incluye el courseId para evitar mezclas
+    const cacheKey = `${courseId}-${moduleId}`;
+    
+    if (!forceRefresh && submissions[cacheKey]) return;
+    
     setLoadingSubmissions(true);
     try {
-      const res = await fetch(`/api/courses/${courseId}/modules/${moduleOrderStr}/submissions`);
+      const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions`);
       if (res.ok) {
         const data = await res.json();
-        setSubmissions(prev => ({ ...prev, [moduleOrderStr]: data.submissions }));
+        setSubmissions(prev => ({ ...prev, [cacheKey]: data.submissions || [] }));
       }
-    } catch (error) {
-      console.error('Error cargando entregas:', error);
-    } finally {
-      setLoadingSubmissions(false);
-    }
+    } catch (error) { console.error('Error cargando entregas:', error); }
+    finally { setLoadingSubmissions(false); }
   };
 
-  const handleGradeSubmission = async (moduleOrderStr: string, submissionId: string, statusGrade: 'aprobado' | 'rechazado', feedback: string) => {
+  const handleGradeSubmission = async (moduleId: string, submissionId: string, statusGrade: 'aprobado' | 'rechazado', feedback: string) => {
     try {
-      const res = await fetch(`/api/courses/${courseId}/modules/${moduleOrderStr}/submissions/${submissionId}`, {
+      const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions/${submissionId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: statusGrade, feedback }),
       });
-
       if (res.ok) {
-        Swal.fire({ 
-          icon: 'success', 
-          title: statusGrade === 'aprobado' ? '¡Aprobado!' : 'Rechazado', 
-          text: statusGrade === 'aprobado' 
-            ? `El alumno ha sido marcado como aprobado. ¡El siguiente módulo ha sido desbloqueado para él!` 
-            : `El alumno deberá volver a entregar esta actividad.`,
-          background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' 
-        });
-        fetchSubmissions(moduleOrderStr, true);
-      } else {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Error al guardar');
-      }
+        Swal.fire({ icon: 'success', title: statusGrade === 'aprobado' ? '¡Aprobado!' : 'Rechazado', text: 'Se ha notificado al alumno por correo.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
+        fetchSubmissions(moduleId, true);
+      } else { throw new Error('Error al guardar'); }
     } catch (error: any) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
     }
   };
 
   const handleEdit = (module: Module) => {
-    const orderStr = String(module.order);
-    setFormData({
-      title: module.title,
-      description: module.description || '',
-      content: module.content,
-      type: (module.type as any) || 'texto',
+    setFormData({ 
+      title: module.title, 
+      description: module.description, 
+      content: module.content, 
+      type: module.type,
+      links: module.links && module.links.length > 0 ? module.links : ['']
     });
     setAssignmentType(module.assignmentType || 'todos');
     setSelectedStudentIds(module.assignedStudentIds?.map(String) || []);
     setCustomGroupName(module.customGroupName || '');
-    
-    const files = (module as any).assignmentFiles || [];
-    setExistingFiles(files);
-    setSelectedFiles([]);
-    
-    setEditingModuleOrder(orderStr);
+    setEditingModuleId(module._id || null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = async (module: Module) => {
-    const orderStr = String(module.order);
-    const result = await Swal.fire({
-      title: '¿Estás seguro?',
-      text: "Se eliminarán también las entregas de los alumnos.",
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#64748b',
-      confirmButtonText: 'Sí, eliminar',
-      background: '#0f172a', color: '#f1f5f9'
-    });
-
+  const handleDelete = async (moduleId: string) => {
+    const result = await Swal.fire({ title: '¿Estás seguro?', text: "Se eliminarán también las entregas de los alumnos.", icon: 'warning', showCancelButton: true, confirmButtonColor: '#ef4444', background: '#0f172a', color: '#f1f5f9' });
     if (result.isConfirmed) {
       try {
-        const res = await fetch(`/api/courses/${courseId}/modules/${orderStr}`, { method: 'DELETE' });
+        const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}`, { method: 'DELETE' });
         if (res.ok) {
-          if (editingModuleOrder === orderStr) {
-            setFormData({ title: '', description: '', content: '', type: 'texto' });
-            setSelectedFiles([]);
-            setExistingFiles([]);
-            setEditingModuleOrder(null);
-            setAssignmentType('todos');
-            setSelectedStudentIds([]);
-            setCustomGroupName('');
+          if (editingModuleId === moduleId) {
+            setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] });
+            setEditingModuleId(null);
           }
-          fetchModules();
-          Swal.fire({ icon: 'success', title: 'Eliminado', text: 'El módulo ha sido eliminado.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
+          fetchData();
+          Swal.fire({ icon: 'success', title: 'Eliminado', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
         }
-      } catch (error: any) {
-        Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
-      }
-    }
-  };
-
-  const handleStudentSelection = (studentId: string, isChecked: boolean) => {
-    if (isChecked) {
-      setSelectedStudentIds(prev => [...prev, studentId]);
-    } else {
-      setSelectedStudentIds(prev => prev.filter(id => id !== studentId));
+      } catch (error) { Swal.fire({ icon: 'error', title: 'Error', background: '#0f172a', color: '#f1f5f9' }); }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-
     try {
-      let finalContent = formData.content;
-
-      if ((formData.type === 'actividad' || formData.type === 'pdf' || formData.type === 'comprimido') && !editingModuleOrder && selectedFiles.length === 0 && existingFiles.length === 0) {
-        throw new Error('Debes seleccionar al menos un archivo para este tipo de módulo.');
-      }
-
-      let finalFiles = [...existingFiles];
-
-      // ✅ AQUÍ ESTÁ EL CAMBIO CLAVE: SUBIDA DIRECTA A CLOUDINARY
-      if (selectedFiles.length > 0) {
-        for (const file of selectedFiles) {
-          const cloudinaryFormData = new FormData();
-          cloudinaryFormData.append('file', file);
-          cloudinaryFormData.append('upload_preset', 'aula_virtual_uploads'); // Tu preset Unsigned
-          cloudinaryFormData.append('cloud_name', 'dvswogrex'); // Tu Cloud Name
-
-          const uploadRes = await fetch('https://api.cloudinary.com/v1_1/dvswogrex/auto/upload', {
-            method: 'POST',
-            body: cloudinaryFormData,
-          });
-
-          if (!uploadRes.ok) {
-            const errorData = await uploadRes.json();
-            throw new Error(errorData.error?.message || `Error al subir el archivo: ${file.name}`);
-          }
-
-          const uploadData = await uploadRes.json();
-          finalFiles.push({
-            url: uploadData.secure_url, // Cloudinary devuelve la URL segura
-            fileName: uploadData.original_filename || file.name,
-            fileType: uploadData.resource_type || file.name.split('.').pop()?.toLowerCase() || 'file'
-          });
-        }
-      }
-
-      if (!finalContent || finalContent.trim() === '') {
-        finalContent = 'Archivos adjuntos al módulo';
-      }
-
       let finalAssignmentType = assignmentType;
-      if (selectedStudentIds.length > 0 && assignmentType === 'todos') {
-        finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
-      } else if (selectedStudentIds.length === 0) {
-        finalAssignmentType = 'todos';
-      }
+      if (selectedStudentIds.length > 0 && assignmentType === 'todos') finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
+      else if (selectedStudentIds.length === 0) finalAssignmentType = 'todos';
 
       const payload = {
         ...formData,
-        content: finalContent,
-        assignmentFiles: finalFiles,
+        links: formData.links.filter(l => l.trim() !== ''),
         assignmentType: finalAssignmentType,
         assignedStudentIds: (finalAssignmentType === 'especificos' || finalAssignmentType === 'grupo') ? selectedStudentIds : [],
         customGroupName: finalAssignmentType === 'grupo' ? customGroupName : undefined,
       };
 
-      const url = editingModuleOrder
-        ? `/api/courses/${courseId}/modules/${editingModuleOrder}`
-        : `/api/courses/${courseId}/modules`;
-      const method = editingModuleOrder ? 'PUT' : 'POST';
+      const url = editingModuleId ? `/api/courses/${courseId}/modules/${editingModuleId}` : `/api/courses/${courseId}/modules`;
+      const method = editingModuleId ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await res.json();
-
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
-        setFormData({ title: '', description: '', content: '', type: 'texto' });
-        setSelectedFiles([]);
-        setExistingFiles([]);
-        setEditingModuleOrder(null);
+        setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] });
+        setEditingModuleId(null);
         setAssignmentType('todos');
         setSelectedStudentIds([]);
         setCustomGroupName('');
-        fetchModules();
-        Swal.fire({ icon: 'success', title: editingModuleOrder ? '¡Módulo actualizado!' : '¡Módulo agregado!', text: 'El contenido se ha guardado correctamente.', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
-      } else {
-        throw new Error(data.error || 'Error al guardar el módulo');
-      }
+        fetchData();
+
+        if (!editingModuleId) {
+          fetch('/api/notify-new-module', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              courseId,
+              courseTitle,
+              moduleTitle: payload.title,
+              moduleType: payload.type,
+              classroomUrl: `${typeof window !== 'undefined' ? window.location.origin : ''}/aula/cursos/${courseId}/contenido`
+            })
+          }).catch(err => console.error('Error enviando notificación:', err));
+        }
+
+        Swal.fire({ icon: 'success', title: '¡Guardado!', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6' });
+      } else { throw new Error('Error al guardar'); }
     } catch (error: any) {
       Swal.fire({ icon: 'error', title: 'Error', text: error.message, background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
-
-  const getIcon = (type: string | undefined) => {
-    if (!type) return <FaFileAlt className="text-slate-400" />;
-    switch (type) {
-      case 'video': return <FaYoutube className="text-red-500" />;
-      case 'pdf': return <FaFilePdf className="text-rose-500" />;
-      case 'enlace': return <FaFileAlt className="text-blue-400" />;
-      case 'actividad': return <FaFileWord className="text-blue-500" />;
-      case 'comprimido': return <FaFileArchive className="text-yellow-500" />;
-      default: return <FaFileAlt className="text-slate-400" />;
-    }
-  };
-
-  const allowedProfessorRoles = ['superadmin', 'admin', 'profesor', 'professor'];
-  const isProfessor = allowedProfessorRoles.includes(userRole);
 
   if (status === 'loading' || isAuthorized === null || !mounted || loading) {
-    return (
-      <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
-        <FaSpinner className="animate-spin text-4xl text-violet-500" />
-      </div>
-    );
+    return <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}><FaSpinner className="animate-spin text-4xl text-violet-500" /></div>;
   }
 
-  if (!isAuthorized) return null;
+  const isProfessor = ['superadmin', 'admin', 'profesor', 'professor'].includes(userRole);
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
@@ -389,10 +218,8 @@ export default function CursoContenidoPage() {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex items-center gap-4 mt-40 mb-4">
-          <button onClick={() => router.push('/aula/cursos')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
-            <FaArrowLeft />
-          </button>
+        <div className="flex items-center gap-4 mt-20 mb-8">
+          <button onClick={() => router.push('/aula/cursos')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"><FaArrowLeft /></button>
           <div>
             <h1 className="text-2xl font-bold text-white">Gestionar Contenido</h1>
             <p className="text-slate-400 text-sm">Curso: <span className="text-violet-400 font-medium">{courseTitle}</span></p>
@@ -404,177 +231,91 @@ export default function CursoContenidoPage() {
             <div className="lg:col-span-1">
               <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 sticky top-6`}>
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  {editingModuleOrder ? <FaEdit className="text-violet-400" /> : <FaPlus className="text-violet-400" />}
-                  {editingModuleOrder ? 'Editar Módulo' : 'Nuevo Módulo'}
+                  {editingModuleId ? <FaEdit className="text-violet-400" /> : <FaPlus className="text-violet-400" />}
+                  {editingModuleId ? 'Editar Módulo' : 'Nuevo Módulo'}
                 </h3>
-
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Título *</label>
-                    <input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm" placeholder="Ej: Introducción al tema" />
+                    <input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} required className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" placeholder="Ej: Introducción" />
                   </div>
-
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Tipo de Contenido *</label>
-                    <select
-                      value={formData.type}
-                      onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm"
-                    >
+                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as any, links: [''] })} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
                       <option value="texto">📝 Texto / Instrucciones</option>
-                      <option value="video">🎥 Enlace de Video (YouTube/Vimeo)</option>
-                      <option value="pdf">📄 Subir Archivo PDF (Entregable)</option>
-                      <option value="comprimido">📦 Archivo Comprimido (ZIP/RAR)</option>
-                      <option value="enlace">🔗 Enlace Externo</option>
-                      <option value="actividad">📚 Actividad / Entrega (Requiere tarea del alumno)</option>
+                      <option value="video">🎥 Enlace(s) de Video</option>
+                      <option value="enlace">🔗 Enlace(s) Externo(s)</option>
                     </select>
                   </div>
 
-                  {['actividad', 'pdf', 'comprimido', 'enlace'].includes(formData.type) && (
-                    <div className="space-y-4 p-4 bg-slate-950/50 border border-violet-500/20 rounded-lg">
-                      <label className="block text-xs font-medium uppercase tracking-wider text-violet-400 mb-1.5 flex items-center gap-2">
-                        <FaUsers className="w-3.5 h-3.5" /> Asignar este contenido a:
-                      </label>
-
-                      <select
-                        value={assignmentType}
-                        onChange={(e) => setAssignmentType(e.target.value as 'todos' | 'especificos' | 'grupo')}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500"
-                      >
-                        <option value="todos">🌍 Todos los alumnos del curso</option>
-                        <option value="especificos">🎯 Alumnos específicos</option>
-                        <option value="grupo">📁 Crear un Grupo Personalizado</option>
-                      </select>
-
-                      {assignmentType === 'grupo' && (
-                        <input
-                          type="text"
-                          value={customGroupName}
-                          onChange={(e) => setCustomGroupName(e.target.value)}
-                          placeholder="Nombre del grupo (Ej: 'Grupo de Refuerzo A')"
-                          required
-                          className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500"
-                        />
-                      )}
-
-                      {(assignmentType === 'especificos' || assignmentType === 'grupo') && (
-                        <div className="space-y-2">
-                          <p className="text-xs text-slate-400">
-                            {assignmentType === 'grupo' ? 'Selecciona los alumnos que integran este grupo:' : 'Selecciona uno o más alumnos:'}
-                          </p>
-                          <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-700 rounded-lg p-3 bg-slate-900/50">
-                            {courseStudents.length === 0 ? (
-                              <p className="text-xs text-slate-500 italic p-2">No hay alumnos inscritos en este curso aún.</p>
-                            ) : (
-                              courseStudents.map((student: any) => {
-                                const sId = getStudentId(student);
-                                const sName = getStudentName(student);
-                                return (
-                                  <label key={sId} className="flex items-center gap-3 text-sm text-slate-300 cursor-pointer hover:bg-slate-800 p-2 rounded transition-colors">
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedStudentIds.includes(sId)}
-                                      onChange={(e) => handleStudentSelection(sId, e.target.checked)}
-                                      className="rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-800 w-4 h-4"
-                                    />
-                                    <span className="truncate">{sName}</span>
-                                  </label>
-                                );
-                              })
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {(formData.type === 'pdf' || formData.type === 'actividad' || formData.type === 'comprimido') && (
-                    <div>
-                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
-                        Archivos de la consigna *
-                      </label>
-                      <input
-                        type="file"
-                        multiple
-                        accept=".pdf,.doc,.docx,.zip,.rar,.7z"
-                        onChange={(e) => {
-                          if (e.target.files) {
-                            const filesArray: File[] = [];
-                            for (let i = 0; i < e.target.files.length; i++) {
-                              filesArray.push(e.target.files[i]);
-                            }
-                            setSelectedFiles(prev => [...prev, ...filesArray]);
-                          }
-                        }}
-                        className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500"
-                      />
-                      
-                      {existingFiles.length > 0 && (
-                        <div className="mt-2 mb-2">
-                          <p className="text-[10px] text-slate-500 uppercase mb-1">Archivos ya guardados:</p>
-                          {existingFiles.map((file, idx) => (
-                            <div key={`exist-${idx}`} className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg text-xs mb-1">
-                              <span className="text-emerald-400 truncate flex-1 flex items-center gap-2">
-                                <FaCheckCircle className="w-3 h-3" /> {file.fileName}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setExistingFiles(prev => prev.filter((_, i) => i !== idx))}
-                                className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
-                              >
-                                <FaTrash className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {selectedFiles.length > 0 && (
-                        <div className="space-y-2 mt-3">
-                          <p className="text-[10px] text-slate-500 uppercase">Nuevos archivos a subir:</p>
-                          {selectedFiles.map((file, idx) => (
-                            <div key={`new-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-sm">
-                              <span className="text-slate-300 truncate flex-1 flex items-center gap-2">
-                                <FaFileAlt className="text-violet-400" /> {file.name}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedFiles(prev => prev.filter((_, i) => i !== idx))}
-                                className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
-                              >
-                                <FaTrash className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Descripción Corta (Opcional)</label>
-                    <input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition-colors text-sm" placeholder="Breve resumen del módulo" />
+                  <div className="space-y-4 p-4 bg-slate-950/50 border border-violet-500/20 rounded-lg">
+                    <label className="block text-xs font-medium uppercase tracking-wider text-violet-400 mb-1.5 flex items-center gap-2"><FaUsers className="w-3.5 h-3.5" /> Asignar a:</label>
+                    <select value={assignmentType} onChange={(e) => setAssignmentType(e.target.value as any)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500">
+                      <option value="todos">🌍 Todos los alumnos</option>
+                      <option value="especificos">🎯 Alumnos específicos</option>
+                      <option value="grupo">📁 Grupo Personalizado</option>
+                    </select>
+                    {assignmentType === 'grupo' && (
+                      <input type="text" value={customGroupName} onChange={(e) => setCustomGroupName(e.target.value)} placeholder="Nombre del grupo" required className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-violet-500" />
+                    )}
+                    {(assignmentType === 'especificos' || assignmentType === 'grupo') && (
+                      <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-700 rounded-lg p-3 bg-slate-900/50">
+                        {courseStudents.map((student: any) => {
+                          const sId = getStudentId(student);
+                          return (
+                            <label key={sId} className="flex items-center gap-3 text-sm text-slate-300 cursor-pointer hover:bg-slate-800 p-2 rounded">
+                              <input type="checkbox" checked={selectedStudentIds.includes(sId)} onChange={(e) => e.target.checked ? setSelectedStudentIds([...selectedStudentIds, sId]) : setSelectedStudentIds(selectedStudentIds.filter(id => id !== sId))} className="rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-800 w-4 h-4" />
+                              <span className="truncate">{getStudentName(student)}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-lg hover:shadow-violet-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                      {submitting ? <FaSpinner className="animate-spin" /> : (editingModuleOrder ? <FaEdit /> : <FaPlus />)}
-                      {submitting ? 'Guardando...' : (editingModuleOrder ? 'Actualizar Módulo' : 'Agregar Módulo')}
-                    </button>
-
-                    {editingModuleOrder && (
-                      <button type="button" onClick={() => { 
-                        setFormData({ title: '', description: '', content: '', type: 'texto' }); 
-                        setSelectedFiles([]);
-                        setExistingFiles([]);
-                        setEditingModuleOrder(null);
-                        setAssignmentType('todos');
-                        setSelectedStudentIds([]);
-                        setCustomGroupName('');
-                      }} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 transition-colors">
-                        Cancelar
+                  {formData.type === 'texto' ? (
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Contenido (Texto) *</label>
+                      <textarea value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm resize-none" placeholder="Escribe las instrucciones..." />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">
+                        {formData.type === 'video' ? 'Enlaces de Video *' : 'Enlaces Externos *'}
+                      </label>
+                      {formData.links.map((link, index) => (
+                        <div key={index} className="flex gap-2 mb-2">
+                          <input 
+                            type="url" 
+                            value={link} 
+                            onChange={(e) => {
+                              const newLinks = [...formData.links];
+                              newLinks[index] = e.target.value;
+                              setFormData({ ...formData, links: newLinks });
+                            }} 
+                            required 
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" 
+                            placeholder="https://..." 
+                          />
+                          {formData.links.length > 1 && (
+                            <button type="button" onClick={() => setFormData({ ...formData, links: formData.links.filter((_, i) => i !== index) })} className="px-3 py-2 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 transition-colors">
+                              <FaTrash className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => setFormData({ ...formData, links: [...formData.links, ''] })} className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 mt-1">
+                        <FaPlus className="w-3 h-3" /> Agregar otro enlace
                       </button>
-                    )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button type="submit" disabled={submitting} className="flex-1 py-2.5 rounded-lg text-sm font-medium bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2">
+                      {submitting ? <FaSpinner className="animate-spin" /> : (editingModuleId ? <FaEdit /> : <FaPlus />)}
+                      {submitting ? 'Guardando...' : (editingModuleId ? 'Actualizar' : 'Agregar')}
+                    </button>
+                    {editingModuleId && <button type="button" onClick={() => { setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] }); setEditingModuleId(null); }} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">Cancelar</button>}
                   </div>
                 </form>
               </div>
@@ -583,141 +324,151 @@ export default function CursoContenidoPage() {
 
           <div className={`${isProfessor ? 'lg:col-span-2' : 'lg:col-span-3'} space-y-4`}>
             <h3 className="text-lg font-bold text-white mb-2">Contenido del Curso ({modules.length})</h3>
-
             {modules.length === 0 ? (
-              <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-8 text-center`}>
-                <p className="text-slate-400">Aún no hay contenido en este curso.</p>
-                <p className="text-slate-500 text-sm mt-1">Usa el formulario para agregar el primer módulo.</p>
-              </div>
+              <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-8 text-center`}><p className="text-slate-400">Aún no hay contenido.</p></div>
             ) : (
-              modules.map((module, index) => {
-                const moduleType = module.type ? String(module.type).toLowerCase().trim() : 'texto';
-                const moduleIdStr = String(module.order);
-                const moduleSubmissions = submissions[moduleIdStr] || [];
+              modules.map((module) => {
+                const moduleId = module._id || String(module.order);
+               const moduleSubmissions = submissions[`${courseId}-${moduleId}`] || [];
+                
+                // 🔍 DEBUG: Verifica en la consola del navegador (F12) si los enlaces llegan desde la API
+                console.log(`Módulo ${module.order} links:`, module.links);
 
                 return (
-                  <div key={moduleIdStr} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
+                  <div key={moduleId} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
                         <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
-                          {getIcon(module.type)}
+                          {module.type === 'video' ? <FaYoutube className="text-red-500" /> : module.type === 'enlace' ? <FaLink className="text-blue-400" /> : <FaFileAlt className="text-slate-400" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className="text-xs font-bold text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded">Módulo {module.order}</span>
-                            <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">{moduleType}</span>
-
-                            {['actividad', 'pdf', 'comprimido', 'enlace'].includes(moduleType) && module.assignmentType && (
+                            <span className="text-[10px] uppercase tracking-wider text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">{module.type}</span>
+                            {module.assignmentType && (
                               <span className="text-[10px] uppercase tracking-wider text-amber-400 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
                                 <FaLayerGroup className="w-2.5 h-2.5" />
-                                {module.assignmentType === 'todos' ? 'Para todos' : module.assignedStudentIds?.length === 1 ? '1 alumno' : `${module.assignedStudentIds?.length || 0} alumnos`}
+                                {module.assignmentType === 'todos' ? 'Para todos' : `${module.assignedStudentIds?.length || 0} alumnos`}
                                 {module.customGroupName && ` (${module.customGroupName})`}
-                              </span>
-                            )}
-                            
-                            {moduleType === 'actividad' && index < modules.length - 1 && (
-                              <span className="text-[10px] uppercase tracking-wider text-emerald-400 border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <FaKey className="w-2.5 h-2.5" /> Desbloquea el Módulo {module.order + 1}
                               </span>
                             )}
                           </div>
                           <h4 className="text-white font-semibold mb-1">{module.title}</h4>
                           {module.description && <p className="text-sm text-slate-400 mb-2">{module.description}</p>}
 
-                          {moduleType === 'texto' ? (
-                            <div className="mt-2 p-4 rounded-lg bg-slate-950/50 border border-slate-800">
-                              <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{module.content}</p>
-                            </div>
-                          ) : (moduleType === 'video' || moduleType === 'enlace') ? (
-                            <a href={formatUrl(module.content)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/40 hover:text-emerald-300 transition-all text-sm font-semibold group/link">
-                              <FaExternalLinkAlt className="w-3.5 h-3.5 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5 transition-transform" />
-                              Abrir {moduleType === 'video' ? 'Video' : 'Enlace Externo'}
-                            </a>
-                          ) : null}
-
-                          {(moduleType === 'actividad' || moduleType === 'pdf' || moduleType === 'comprimido') && (
-                            <div className="mt-4 space-y-4">
-                              {(() => {
-                                const filesToDownload = (module as any).assignmentFiles && (module as any).assignmentFiles.length > 0
-                                  ? (module as any).assignmentFiles
-                                  : (module.assignmentFileUrl ? [{ url: module.assignmentFileUrl, fileName: module.title, fileType: 'file' }] : []);
-
-                                return filesToDownload.map((file: any, idx: number) => (
-                                  <a
-                                    key={idx}
-                                    href={getProxyDownloadUrl(file.url, file.fileName)}
-                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 transition-all text-sm font-semibold group/link w-full sm:w-auto"
-                                  >
-                                    <FaDownload className="w-4 h-4" />
-                                    {file.fileType === 'zip' || file.fileType === 'rar' || file.fileType === '7z' 
-                                      ? 'Descargar Archivo Comprimido' 
-                                      : `Descargar: ${file.fileName}`}
-                                  </a>
-                                ));
-                              })()}
-
-                              {(moduleType === 'actividad' || moduleType === 'comprimido' || moduleType === 'pdf') && isProfessor && (
-                                <div className="mt-4 pt-4 border-t border-slate-700/50">
-                                  <button onClick={() => fetchSubmissions(moduleIdStr)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
-                                    <FaSpinner className={`w-3 h-3 ${loadingSubmissions ? 'animate-spin' : ''}`} />
-                                    {loadingSubmissions ? 'Cargando entregas...' : `📥 Ver entregas y Corregir (${moduleSubmissions.length})`}
-                                  </button>
-
-                                  {moduleSubmissions.length > 0 ? (
-                                    <div className="space-y-3">
-                                      {moduleSubmissions.map((sub) => (
-                                        <div key={sub._id} className="p-4 rounded-lg bg-slate-950/80 border border-slate-700">
-                                          <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                              <p className="text-sm font-semibold text-white">{sub.studentName}</p>
-                                              <p className="text-xs text-slate-400">{sub.studentEmail}</p>
-                                              <p className="text-[10px] text-slate-500 mt-1">Entregado: {new Date(sub.submittedAt).toLocaleDateString()}</p>
-                                            </div>
-                                            <span className={`text-[10px] px-2 py-1 rounded font-bold ${sub.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : sub.status === 'rechazado' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'}`}>
-                                              {sub.status.toUpperCase()}
-                                            </span>
-                                          </div>
-
-                                          <a href={getProxyDownloadUrl(sub.fileUrl, sub.fileName)} className="text-xs text-blue-400 hover:underline flex items-center gap-1 mb-3">
-                                            <FaFileWord className="w-3 h-3" /> Descargar entrega: {sub.fileName}
-                                          </a>
-
-                                          <form onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const form = e.currentTarget;
-                                            const formData = new FormData(form);
-                                            const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
-                                            const status = submitter?.value === 'aprobado' ? 'aprobado' : 'rechazado';
-                                            const feedback = (formData.get('feedback') as string) || '';
-                                            handleGradeSubmission(moduleIdStr, sub._id, status, feedback);
-                                          }} className="space-y-2">
-                                            <textarea name="feedback" defaultValue={sub.feedback || ''} placeholder="Escribe tu devolución..." className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" rows={2} />
-                                            <div className="flex gap-2">
-                                              <button type="submit" name="status" value="aprobado" className="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1">
-                                                <FaCheckCircle className="w-3 h-3" /> Aprobar
-                                              </button>
-                                              <button type="submit" name="status" value="rechazado" className="flex-1 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center justify-center gap-1">
-                                                <FaTimesCircle className="w-3 h-3" /> Rechazar
-                                              </button>
-                                            </div>
-                                          </form>
-                                        </div>
-                                      ))}
-                                    </div>
+                                                  {/* ✅ RENDERIZADO DE CONTENIDO 100% A PRUEBA DE FALLOS */}
+                          <div className="mt-3 space-y-3">
+                            {/* 1. Si es texto y hay contenido, mostrarlo */}
+                            {module.type === 'texto' && module.content && module.content.trim() !== '' && (
+                              <div className="p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap">
+                                {module.content}
+                              </div>
+                            )}
+                            
+                            {/* 2. Lógica principal para Videos y Enlaces */}
+                            {(module.type === 'video' || module.type === 'enlace') && (
+                              <div className="space-y-2">
+                                {/* Opción A: El nuevo formato con array de links */}
+                                {module.links && module.links.length > 0 && module.links.some((l: string) => l.trim() !== '') ? (
+                                  module.links.filter((l: string) => l.trim() !== '').map((link: string, idx: number) => {
+                                    const totalValid = module.links.filter((l: string) => l.trim() !== '').length;
+                                    return (
+                                      <a 
+                                        key={idx} 
+                                        href={link} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
+                                          module.type === 'video' 
+                                            ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
+                                            : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                                        }`}
+                                      >
+                                        {module.type === 'video' ? <FaYoutube className="w-4 h-4" /> : <FaExternalLinkAlt className="w-4 h-4" />}
+                                        {module.type === 'video' 
+                                          ? `Ver Video ${totalValid > 1 ? idx + 1 : ''}` 
+                                          : `Abrir Enlace ${totalValid > 1 ? idx + 1 : ''}`
+                                        }
+                                      </a>
+                                    );
+                                  })
+                                ) : (
+                                  /* Opción B: Fallback para cuando la URL está guardada en 'content' (como en tu BD actual) */
+                                  module.content && module.content.trim().startsWith('http') ? (
+                                    <a 
+                                      href={module.content} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
+                                        module.type === 'video' 
+                                          ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
+                                          : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                                      }`}
+                                    >
+                                      {module.type === 'video' ? <FaYoutube className="w-4 h-4" /> : <FaExternalLinkAlt className="w-4 h-4" />}
+                                      {module.type === 'video' ? 'Ver Video' : 'Abrir Enlace Externo'}
+                                    </a>
                                   ) : (
-                                    <p className="text-xs text-slate-500 italic mt-2">Aún no hay entregas para este módulo.</p>
-                                  )}
+                                    /* Opción C: Aviso si el módulo está realmente vacío */
+                                    <p className="text-xs text-rose-400 italic flex items-center gap-1">
+                                      ⚠️ Este módulo no tiene enlaces configurados. Edítalo para agregar uno.
+                                    </p>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {isProfessor && (
+                            <div className="mt-4 pt-4 border-t border-slate-700/50">
+                              <button onClick={() => fetchSubmissions(moduleId)} className="text-xs text-violet-400 hover:text-violet-300 mb-3 flex items-center gap-1 font-semibold">
+                                <FaSpinner className={`w-3 h-3 ${loadingSubmissions ? 'animate-spin' : ''}`} />
+                                {loadingSubmissions ? 'Cargando...' : `📥 Ver entregas (${moduleSubmissions.length})`}
+                              </button>
+                              {moduleSubmissions.length > 0 ? (
+                                <div className="space-y-3">
+                                  {moduleSubmissions.map((sub) => (
+                                    <div key={sub._id} className="p-4 rounded-lg bg-slate-950/80 border border-slate-700">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                          <p className="text-sm font-semibold text-white">{sub.studentName}</p>
+                                          <p className="text-[10px] text-slate-500 mt-1">Entregado: {new Date(sub.submittedAt).toLocaleDateString()}</p>
+                                          {sub.deliveryLink && (
+                                            <a href={sub.deliveryLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-1 mt-1">
+                                              <FaExternalLinkAlt className="w-3 h-3" /> Ver resolución del alumno
+                                            </a>
+                                          )}
+                                        </div>
+                                        <span className={`text-[10px] px-2 py-1 rounded font-bold ${sub.status === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : sub.status === 'rechazado' ? 'bg-rose-500/20 text-rose-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                          {sub.status.toUpperCase()}
+                                        </span>
+                                      </div>
+                                      <form onSubmit={(e) => {
+                                        e.preventDefault();
+                                        const form = e.currentTarget;
+                                        const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+                                        const status = submitter?.value === 'aprobado' ? 'aprobado' : 'rechazado';
+                                        const feedback = (form.querySelector('textarea') as HTMLTextAreaElement)?.value || '';
+                                        handleGradeSubmission(moduleId, sub._id, status, feedback);
+                                      }} className="space-y-2 mt-3">
+                                        <textarea name="feedback" defaultValue={sub.feedback || ''} placeholder="Escribe tu devolución..." className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500" rows={2} />
+                                        <div className="flex gap-2">
+                                          <button type="submit" name="status" value="aprobado" className="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center justify-center gap-1"><FaCheckCircle className="w-3 h-3" /> Aprobar</button>
+                                          <button type="submit" name="status" value="rechazado" className="flex-1 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center justify-center gap-1"><FaTimesCircle className="w-3 h-3" /> Rechazar</button>
+                                        </div>
+                                      </form>
+                                    </div>
+                                  ))}
                                 </div>
-                              )}
+                              ) : <p className="text-xs text-slate-500 italic mt-2">Aún no hay entregas.</p>}
                             </div>
                           )}
                         </div>
                       </div>
-
                       {isProfessor && (
                         <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => handleEdit(module)} className="p-2 rounded-lg text-slate-600 hover:text-violet-400 hover:bg-violet-500/10 transition-colors" title="Editar módulo"><FaEdit /></button>
-                          <button onClick={() => handleDelete(module)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10 transition-colors" title="Eliminar módulo"><FaTrash /></button>
+                          <button onClick={() => handleEdit(module)} className="p-2 rounded-lg text-slate-600 hover:text-violet-400 hover:bg-violet-500/10"><FaEdit /></button>
+                          <button onClick={() => handleDelete(moduleId)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-rose-500/10"><FaTrash /></button>
                         </div>
                       )}
                     </div>

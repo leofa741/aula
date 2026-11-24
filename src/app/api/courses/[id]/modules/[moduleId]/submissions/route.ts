@@ -1,46 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import connectDB from '@/app/lib/mongoose';
 import { authOptions } from '@/app/lib/auth';
+import connectDB from '@/app/lib/mongoose';
 import Course from '@/app/models/Course';
 import Submission from '@/app/models/Submission';
+import nodemailer from 'nodemailer';
 
-// ✅ GET: Obtener entregas
+
+
+
+
+
+
+// ✅ GET: Obtener entregas de un módulo específico de un curso específico
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; moduleId: string }> }
 ) {
   try {
     await connectDB();
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
+    
+    // Obtenemos AMBOS IDs de la URL
     const { id: courseId, moduleId } = await params;
-    const course = await Course.findById(courseId);
-    if (!course) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
 
-    const isProfessor = course.professor.toString() === session.user.id || ['admin', 'superadmin'].includes(session.user.role);
+    // 🔒 CORRECCIÓN CRÍTICA: Filtramos POR AMBOS campos. 
+    // Así nunca traerá entregas de otro curso que casualmente tenga un "Módulo 1"
+    const submissions = await Submission.find({
+      courseId: courseId,
+      moduleId: moduleId
+    }).sort({ submittedAt: -1 });
 
-    let query: any = { courseId, moduleId };
-    if (!isProfessor) {
-      // Si es alumno, solo ve sus propias entregas
-      query.studentId = session.user.id;
-    }
-
-    const submissions = await Submission.find(query).sort({ createdAt: -1 });
     return NextResponse.json({ success: true, submissions }, { status: 200 });
-
   } catch (error) {
-    console.error('Error obteniendo entregas:', error);
+    console.error('Error al obtener entregas:', error);
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
 
-// ✅ POST: Alumno envía una entrega
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string; moduleId: string }> }
-) {
+// ... (aquí abajo deja tus funciones POST y PUT tal como las tenías, esas funcionan bien) ...
+
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string; moduleId: string }> }) {
   try {
     await connectDB();
     const session = await getServerSession(authOptions);
@@ -48,83 +47,92 @@ export async function POST(
 
     const { id: courseId, moduleId } = await params;
     const body = await req.json();
-    const { fileUrl, fileName } = body;
+    const { studentId, studentName, studentEmail, deliveryLink } = body;
 
-    if (!fileUrl || !fileName) {
-      return NextResponse.json({ error: 'Faltan datos del archivo' }, { status: 400 });
-    }
-
-    // Verificar que el curso exista y obtener datos del profesor para el email
     const course = await Course.findById(courseId).populate('professor', 'name email');
-    if (!course) {
-      return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
+    if (!course) return NextResponse.json({ error: 'Curso no encontrado' }, { status: 404 });
+
+    const newSubmission = await Submission.create({
+      moduleId, courseId, studentId, studentName, studentEmail, deliveryLink, status: 'pendiente'
+    });
+
+    // 📧 Notificar al profesor
+    const professor = course.professor as any;
+    if (professor?.email) {
+      const transporter = nodemailer.createTransport({
+        service: process.env.MAILER_SERVICE || 'gmail',
+        auth: { user: process.env.MAILER_EMAIL, pass: process.env.MAILER_SECRET_KEY },
+      });
+
+      await transporter.sendMail({
+        from: `"Aula Virtual" <${process.env.MAILER_EMAIL}>`,
+        to: professor.email,
+        subject: `📬 Nueva entrega en: ${course.title}`,
+        html: `
+          <div style="font-family: sans-serif; background: #0f172a; color: #f1f5f9; padding: 20px; border-radius: 8px;">
+            <h2 style="color: #f59e0b;">📬 Nueva Entrega de Alumno</h2>
+            <p>Hola <strong>${professor.name}</strong>,</p>
+            <p>El alumno <strong>${studentName}</strong> ha entregado una resolución.</p>
+            <div style="background: #1e293b; padding: 15px; border-left: 4px solid #f59e0b; margin: 20px 0;">
+              <strong>Curso:</strong> ${course.title}<br>
+              <strong>Módulo:</strong> ${moduleId}
+            </div>
+          </div>
+        `
+      });
     }
 
-    // Verificar que el alumno esté inscripto (o sea el propio profesor probando)
-    const isEnrolled = course.students.some((studentId: any) => studentId.toString() === session.user.id);
-    const isProfessor = course.professor._id.toString() === session.user.id;
-
-    if (!isEnrolled && !isProfessor) {
-      return NextResponse.json({ error: 'No estás inscripto en este curso' }, { status: 403 });
-    }
-
-    // Crear o actualizar la entrega (Upsert)
-    const submission = await Submission.findOneAndUpdate(
-      { courseId, moduleId, studentId: session.user.id },
-      {
-        studentName: session.user.name || 'Alumno',
-        studentEmail: session.user.email || '',
-        fileUrl,
-        fileName,
-        status: 'pendiente',
-        feedback: ''
-      },
-      { upsert: true, new: true }
-    );
-
-    // 📧 DISPARAR NOTIFICACIÓN AL PROFESOR (Usando la ruta dedicada)
-    // 📧 DISPARAR NOTIFICACIÓN AL PROFESOR (Usando la ruta dedicada)
-    try {
-      const professor = course.professor as any;
-      if (professor?.email) {
-        
-        // ✅ BÚSQUEDA ROBUSTA: Busca el módulo por _id, id, order, o "module-order"
-        const moduleInfo = course.modules.find((m: any) => 
-          m._id?.toString() === moduleId || 
-          m.id === moduleId || 
-          m.order.toString() === moduleId || 
-          `module-${m.order}` === moduleId
-        );
-
-        const appUrl = process.env.NEXT_APP_URL || 'http://localhost:3000';
-        const classroomUrl = `${appUrl}/aula/cursos/${courseId}`;
+    return NextResponse.json({ success: true, submission: newSubmission }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}
 
 
-        // Llamamos a nuestra API de notificación en segundo plano
-        await fetch(`${appUrl}/api/notify-submission`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            professorEmail: professor.email,
-            professorName: professor.name || 'Profesor',
-            studentName: session.user.name || 'Alumno',
-            studentEmail: session.user.email || '',
-            courseTitle: course.title,
-            moduleTitle: moduleInfo?.title || 'Actividad sin título', // ✅ Fallback por si acaso
-            fileName: fileName,
-            fileUrl: fileUrl,
-            classroomUrl: classroomUrl
-          })
-        });
-      }
-    } catch (emailError) {
-      // ⚠️ Importante: No fallamos la entrega si el email falla, solo lo registramos
-      console.error('⚠️ Falló el envío del email de notificación:', emailError);
-    }
-    return NextResponse.json({ success: true, submission }, { status: 201 });
 
-  } catch (error: any) {
-    console.error('Error creando entrega:', error);
-    return NextResponse.json({ error: error.message || 'Error interno' }, { status: 500 });
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string; moduleId: string; submissionId: string }> }) {
+  try {
+    await connectDB();
+    const session = await getServerSession(authOptions);
+    if (!session?.user) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+    const { submissionId } = await params;
+    const body = await req.json();
+    const { status, feedback } = body;
+
+    const submission = await Submission.findById(submissionId).populate('studentId', 'name email');
+    if (!submission) return NextResponse.json({ error: 'Entrega no encontrada' }, { status: 404 });
+
+    submission.status = status;
+    submission.feedback = feedback || '';
+    await submission.save();
+
+    // 📧 Notificar al alumno
+    const student = submission.studentId as any;
+    const transporter = nodemailer.createTransport({
+      service: process.env.MAILER_SERVICE || 'gmail',
+      auth: { user: process.env.MAILER_EMAIL, pass: process.env.MAILER_SECRET_KEY },
+    });
+
+    const isApproved = status === 'aprobado';
+    await transporter.sendMail({
+      from: `"Aula Virtual" <${process.env.MAILER_EMAIL}>`,
+      to: student.email,
+      subject: `📚 Tu entrega ha sido ${isApproved ? 'Aprobada' : 'Revisada'}`,
+      html: `
+        <div style="font-family: sans-serif; background: #0f172a; color: #f1f5f9; padding: 20px; border-radius: 8px;">
+          <h2 style="color: ${isApproved ? '#10b981' : '#f43f5e'}">${isApproved ? '¡Aprobada! 🎉' : 'Requiere ajustes ⚠️'}</h2>
+          <p>Hola <strong>${student.name}</strong>,</p>
+          <p>Tu profesor ha revisado tu entrega.</p>
+          <div style="background: #1e293b; padding: 15px; border-left: 4px solid ${isApproved ? '#10b981' : '#f43f5e'}; margin: 20px 0;">
+            <strong>Devolución:</strong><br>"${feedback || 'Sin comentarios adicionales.'}"
+          </div>
+        </div>
+      `
+    });
+
+    return NextResponse.json({ success: true, submission });
+  } catch (error) {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

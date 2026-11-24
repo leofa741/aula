@@ -1,22 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-// ✅ 1. NUEVA INTERFAZ PARA LOS ARCHIVOS ADJUNTOS
-export interface IModuleFile {
-  url: string;
-  fileName: string;
-  fileType: string;
-}
-
 export interface IModule {
   title: string;
   description: string;
-  content?: string;
-  type?: 'texto' | 'video' | 'pdf' | 'enlace' | 'actividad' | 'comprimido';
-  
-  // ✅ 2. CAMPOS DE ARCHIVOS (Nuevo array + campo antiguo por compatibilidad)
-  assignmentFiles?: IModuleFile[]; 
-  assignmentFileUrl?: string; 
-  
+  content: string;
+  links: string[];
+  type: 'texto' | 'video' | 'enlace';
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: mongoose.Types.ObjectId[];
@@ -36,23 +25,12 @@ export interface ICourse extends Document {
   updatedAt: Date;
 }
 
-// ✅ 3. SCHEMA PARA EL ARCHIVO INDIVIDUAL
-const ModuleFileSchema = new Schema<IModuleFile>({
-  url: { type: String, required: true },
-  fileName: { type: String, required: true },
-  fileType: { type: String, required: true }
-}, { _id: false });
-
 const ModuleSchema = new Schema<IModule>({
   title: { type: String, required: true },
   description: { type: String, default: '' },
   content: { type: String, default: '' },
-  type: { type: String, enum: ['texto', 'video', 'pdf', 'enlace', 'actividad', 'comprimido'], default: 'texto' },
-  
-  // ✅ 4. ACTUALIZAR SCHEMA DEL MÓDULO
-  assignmentFiles: { type: [ModuleFileSchema], default: [] },
-  assignmentFileUrl: { type: String, default: '' }, // Mantenido por compatibilidad
-  
+  links: [{ type: String }],
+  type: { type: String, enum: ['texto', 'video', 'enlace'], default: 'texto' },
   order: { type: Number, required: true },
   assignmentType: { type: String, enum: ['todos', 'especificos', 'grupo'], default: 'todos' },
   assignedStudentIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
@@ -68,25 +46,17 @@ const CourseSchema = new Schema<ICourse>(
     professor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     students: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     modules: [ModuleSchema],
-    status: {
-      type: String,
-      enum: ['activo', 'borrador', 'finalizado'],
-      default: 'borrador'
-    }
+    status: { type: String, enum: ['activo', 'borrador', 'finalizado'], default: 'borrador' }
   },
   { timestamps: true }
 );
 
 CourseSchema.pre('save', function (next) {
   if (this.isModified('title') && !this.isModified('slug')) {
-    this.slug = this.title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)+/g, '');
+    this.slug = this.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   }
   next();
 });
-
 
 const Course = mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
 export default Course;

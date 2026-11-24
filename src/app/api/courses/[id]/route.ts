@@ -27,4 +27,5 @@ export async function GET(
     console.error('❌ Error al obtener el curso:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
+  
 }

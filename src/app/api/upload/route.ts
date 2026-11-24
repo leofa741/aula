@@ -3,7 +3,6 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
 import { v2 as cloudinary } from 'cloudinary';
 
-// Configura Cloudinary con tus variables de entorno (.env)
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -24,16 +23,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'No se proporcionó ningún archivo' }, { status: 400 });
         }
 
-        // Convertir el archivo a buffer para subirlo a Cloudinary
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Subir a Cloudinary
         const uploadResult = await new Promise((resolve, reject) => {
             cloudinary.uploader.upload_stream(
                 {
-                    resource_type: 'raw', // ✅ ESTO ES OBLIGATORIO para PDFs, DOCs, etc.
-                    folder: 'aula-virtual/entregas' // Carpeta organizada en tu Cloudinary
+                    resource_type: 'raw',
+                    folder: 'aula-virtual/entregas',
+                    access_mode: 'public' // ✅ ¡ESTA ES LA CLAVE! Fuerza a que el archivo sea público y descargable
                 },
                 (error, result) => {
                     if (error) reject(error);

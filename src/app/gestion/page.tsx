@@ -27,21 +27,52 @@ const theme = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 🕒 HELPER: Formato de tiempo relativo premium
+// 🕒 HELPER: Formato de fecha y hora 100% Argentina (UTC-3)
 // ─────────────────────────────────────────────────────────────
+const formatDateAR = (dateString: string) => {
+  return new Date(dateString).toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+};
+
 const getRelativeTime = (dateString: string) => {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = date.getTime() - now.getTime();
+  // Forzamos la interpretación en zona horaria de Argentina para comparar correctamente
+  const dateStrAR = new Date(dateString).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const nowStrAR = new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
+  
+  const dateObj = new Date(dateStrAR);
+  const nowObj = new Date(nowStrAR);
+  
+  const diffMs = dateObj.getTime() - nowObj.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
   
-  const timeStr = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  // Obtenemos solo la hora y minuto en formato Argentina
+  const timeStr = new Date(dateString).toLocaleTimeString('es-AR', { 
+    timeZone: 'America/Argentina/Buenos_Aires',
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false 
+  });
   
   if (diffHours < 0) return 'Finalizado';
   if (diffHours < 1) return `En menos de 1 hora (${timeStr})`;
   if (diffHours < 24) return `Hoy a las ${timeStr}`;
   if (diffHours < 48) return `Mañana a las ${timeStr}`;
-  return date.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  
+  return new Date(dateString).toLocaleDateString('es-AR', { 
+    timeZone: 'America/Argentina/Buenos_Aires',
+    weekday: 'short', 
+    day: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: false
+  });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -147,45 +178,30 @@ export default function PanelGestionPage() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
-  
-  // ✅ Estado para las alertas de próximos eventos
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     const validateAccess = async () => {
       if (status === 'loading' || !mounted) return;
-      if (status === 'unauthenticated') {
-        router.push('/login');
-        return;
-      }
+      if (status === 'unauthenticated') { router.push('/login'); return; }
 
       const token = session?.user?.token || localStorage.getItem('token');
-      if (!token) {
-        router.push('/login');
-        return;
-      }
+      if (!token) { router.push('/login'); return; }
 
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const allowedRoles = ['superadmin', 'admin', 'profesor', 'alumno'];
-        if (!allowedRoles.includes(payload.role)) {
-          router.push('/');
-          return;
-        }
+        if (!allowedRoles.includes(payload.role)) { router.push('/'); return; }
         setIsAuthorized(true);
       } catch {
         router.push('/login');
       }
     };
-
     validateAccess();
   }, [status, session, router, mounted]);
 
-  // ✅ Cargar próximos eventos (próximas 48 horas)
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
       try {
@@ -201,7 +217,7 @@ export default function PanelGestionPage() {
               return startDate >= now && startDate <= in48Hours;
             })
             .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
-            .slice(0, 3); // Mostramos máximo los 3 próximos
+            .slice(0, 3);
             
           setUpcomingEvents(filtered);
         }
@@ -210,9 +226,7 @@ export default function PanelGestionPage() {
       }
     };
 
-    if (isAuthorized) {
-      fetchUpcomingEvents();
-    }
+    if (isAuthorized) fetchUpcomingEvents();
   }, [isAuthorized]);
 
   if (status === 'loading' || isAuthorized === null || !mounted) {
@@ -228,78 +242,14 @@ export default function PanelGestionPage() {
   const userRole = session?.user?.role || 'alumno';
 
   const allModules = [
-    {
-      title: "Gestión de Usuarios",
-      description: "Administra alumnos, profesores y roles del sistema. Asigna permisos y revisa cuentas.",
-      icon: <FaUsers className="w-6 h-6" />,
-      href: "/admin",
-      color: "from-violet-600 to-fuchsia-600",
-      available: true,
-      roles: ["admin", "superadmin"]
-    },
-    {
-      title: "Cursos y Materias",
-      description: "Crea y administra tus cursos, organiza módulos de contenido y revisa a tus alumnos.",
-      icon: <FaBookOpen className="w-6 h-6" />,
-      href: "/aula/cursos",
-      color: "from-emerald-600 to-teal-600",
-      available: true,
-      roles: ["admin", "superadmin", "profesor"]
-    },
-    {
-      title: "Mis Cursos",
-      description: "Accede a las clases en vivo, materiales y tareas de los cursos en los que estás inscrito.",
-      icon: <FaUserGraduate className="w-6 h-6" />,
-      href: "/aula/mis-cursos",
-      color: "from-emerald-600 to-teal-600",
-      available: true,
-      roles: ["alumno", "profesor", "admin", "superadmin"]
-    },
-    {
-      title: "Calendario de Clases",
-      description: "Visualiza y agenda clases en vivo, reuniones y fechas importantes de tus cursos.",
-      icon: <FaCalendarAlt className="w-6 h-6" />,
-      href: "/aula/calendario",
-      color: "from-violet-600 to-fuchsia-600",
-      available: true,
-      roles: ["alumno", "profesor", "admin", "superadmin"]
-    },
-    {
-      title: "Catálogo de Cursos",
-      description: "Explora los cursos disponibles e inscríbete para comenzar a aprender.",
-      icon: <FaBookOpen className="w-6 h-6" />,
-      href: "/aula/cursos-disponibles",
-      color: "from-blue-600 to-indigo-600",
-      available: true,
-      roles: ["alumno"]
-    },
-    {
-      title: "Ide y Compilador en la Nube",
-      description: "Escribe, compila y ejecuta código en múltiples lenguajes directamente desde tu navegador.",
-      icon: <FaBookOpen className="w-6 h-6" />,
-      href: "/aula/ide",
-      color: "from-blue-600 to-indigo-600",
-      available: true,
-      roles: ["alumno", "profesor", "admin", "superadmin"]
-    },
-    {
-      title: "Tareas y Calificaciones",
-      description: "Revisa entregas de alumnos, deja feedback y gestiona el libro de calificaciones.",
-      icon: <FaClipboardCheck className="w-6 h-6" />,
-      href: "/aula/tareas",
-      color: "from-amber-500 to-orange-600",
-      available: false,
-      roles: ["alumno", "profesor", "admin", "superadmin"]
-    },
-    {
-      title: "Configuración",
-      description: "Ajustes generales de la plataforma, métodos de pago o integración de servicios.",
-      icon: <FaCog className="w-6 h-6" />,
-      href: "/gestion/configuracion",
-      color: "from-slate-600 to-slate-700",
-      available: false,
-      roles: ["admin", "superadmin"]
-    }
+    { title: "Gestión de Usuarios", description: "Administra alumnos, profesores y roles del sistema.", icon: <FaUsers className="w-6 h-6" />, href: "/admin", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["admin", "superadmin"] },
+    { title: "Cursos y Materias", description: "Crea y administra tus cursos y revisa a tus alumnos.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["admin", "superadmin", "profesor"] },
+    { title: "Mis Cursos", description: "Accede a las clases en vivo, materiales y tareas.", icon: <FaUserGraduate className="w-6 h-6" />, href: "/aula/mis-cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
+    { title: "Calendario de Clases", description: "Visualiza y agenda clases, reuniones y fechas importantes.", icon: <FaCalendarAlt className="w-6 h-6" />, href: "/aula/calendario", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
+    { title: "Catálogo de Cursos", description: "Explora los cursos disponibles e inscríbete.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos-disponibles", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno"] },
+    { title: "Ide y Compilador en la Nube", description: "Escribe, compila y ejecuta código en tu navegador.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/ide", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
+    { title: "Tareas y Calificaciones", description: "Revisa entregas de alumnos y gestiona calificaciones.", icon: <FaClipboardCheck className="w-6 h-6" />, href: "/aula/tareas", color: "from-amber-500 to-orange-600", available: false, roles: ["alumno", "profesor", "admin", "superadmin"] },
+    { title: "Configuración", description: "Ajustes generales de la plataforma.", icon: <FaCog className="w-6 h-6" />, href: "/gestion/configuracion", color: "from-slate-600 to-slate-700", available: false, roles: ["admin", "superadmin"] }
   ];
 
   const visibleModules = allModules.filter(module => module.roles.includes(userRole));
@@ -312,8 +262,6 @@ export default function PanelGestionPage() {
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
-
-        {/* Header del Dashboard */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 mt-40 mb-4">
@@ -326,21 +274,14 @@ export default function PanelGestionPage() {
               Hola, {session?.user?.name || 'Usuario'}
             </h1>
             <p className="text-slate-400 mt-2 max-w-xl">
-              {userRole === 'alumno'
-                ? 'Selecciona un módulo para acceder a tus cursos y materiales de estudio.'
-                : 'Selecciona un módulo para comenzar a gestionar el Aula Virtual.'}
+              {userRole === 'alumno' ? 'Selecciona un módulo para acceder a tus cursos.' : 'Selecciona un módulo para gestionar el Aula Virtual.'}
             </p>
           </div>
-
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm"
-          >
+          <Link href="/" className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 text-slate-300 hover:text-white transition-all text-sm">
             Volver al sitio público
           </Link>
         </div>
 
-        {/* ✅ SECCIÓN DE ALERTAS Y PRÓXIMOS EVENTOS (Solo si hay eventos) */}
         {upcomingEvents.length > 0 && (
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
@@ -358,20 +299,15 @@ export default function PanelGestionPage() {
           </div>
         )}
 
-        {/* Grid de Módulos (Filtrado por rol) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visibleModules.map((module, index) => (
             <ModuleCard key={index} {...module} />
           ))}
         </div>
 
-        {/* Footer informativo */}
         <div className="mt-16 pt-8 border-t border-slate-800/50 text-center">
-          <p className="text-xs text-slate-500">
-            Sistema de Gestión de Aula Virtual v1.0 · Desarrollado con Next.js & Tailwind CSS
-          </p>
+          <p className="text-xs text-slate-500">Sistema de Gestión de Aula Virtual v1.0 · Desarrollado con Next.js & Tailwind CSS</p>
         </div>
-
       </div>
     </div>
   );

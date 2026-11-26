@@ -14,17 +14,17 @@ export default function HomePage() {
         <div className="relative w-24 h-24 mx-auto">
           <div className="absolute inset-0 bg-amber-500/10 rounded-full animate-ping duration-[3000ms]" />
           <div className="relative w-24 h-24 bg-slate-900/50 backdrop-blur-md rounded-full border border-amber-500/20 flex items-center justify-center shadow-2xl shadow-amber-900/10">
-            <svg 
-              className="w-10 h-10 text-amber-400" 
-              fill="none" 
-              viewBox="0 0 24 24" 
+            <svg
+              className="w-10 h-10 text-amber-400"
+              fill="none"
+              viewBox="0 0 24 24"
               stroke="currentColor"
             >
-              <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth={1.5} 
-                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" 
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           </div>
@@ -53,20 +53,21 @@ export default function HomePage() {
         </div>*/}
 
         {/* Contacto discreto para no perder oportunidades */}
+        {/* Contacto discreto para no perder oportunidades */}
         <div className="pt-4">
           <p className="text-slate-600 text-sm">
             ¿Consultas?{' '}
-            <a 
-              href="/contact" 
+            <a
+              href="/contact"
               className="text-amber-400/80 hover:text-amber-300 transition-colors duration-300 underline underline-offset-4 decoration-amber-500/30"
             >
-              
+              Contactanos aquí
             </a>
           </p>
         </div>
       </div>
- 
-    
+
+
     </div>
   );
 }

@@ -27,9 +27,11 @@ const theme = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 🕒 HELPER: Formato de fecha y hora 100% Argentina (UTC-3)
+// 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
 // ─────────────────────────────────────────────────────────────
-const formatDateAR = (dateString: string) => {
+
+// 1. Para MOSTRAR la fecha en texto al usuario (Blindado para Argentina)
+const formatDisplayDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
     day: '2-digit',
@@ -41,8 +43,8 @@ const formatDateAR = (dateString: string) => {
   });
 };
 
+// 2. Para calcular el tiempo relativo en las alertas
 const getRelativeTime = (dateString: string) => {
-  // Forzamos la interpretación en zona horaria de Argentina para comparar correctamente
   const dateStrAR = new Date(dateString).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
   const nowStrAR = new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
   
@@ -52,27 +54,15 @@ const getRelativeTime = (dateString: string) => {
   const diffMs = dateObj.getTime() - nowObj.getTime();
   const diffHours = diffMs / (1000 * 60 * 60);
   
-  // Obtenemos solo la hora y minuto en formato Argentina
-  const timeStr = new Date(dateString).toLocaleTimeString('es-AR', { 
-    timeZone: 'America/Argentina/Buenos_Aires',
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false 
-  });
+  // Extraemos solo la hora de la función de visualización unificada
+  const timeStr = formatDisplayDate(dateString).split(', ')[1]; 
   
   if (diffHours < 0) return 'Finalizado';
   if (diffHours < 1) return `En menos de 1 hora (${timeStr})`;
   if (diffHours < 24) return `Hoy a las ${timeStr}`;
   if (diffHours < 48) return `Mañana a las ${timeStr}`;
   
-  return new Date(dateString).toLocaleDateString('es-AR', { 
-    timeZone: 'America/Argentina/Buenos_Aires',
-    weekday: 'short', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit',
-    hour12: false
-  });
+  return formatDisplayDate(dateString);
 };
 
 // ─────────────────────────────────────────────────────────────

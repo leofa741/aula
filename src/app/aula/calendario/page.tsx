@@ -22,7 +22,7 @@ const theme = {
 // 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
 // ─────────────────────────────────────────────────────────────
 
-// 1. Convierte una fecha UTC a string "YYYY-MM-DDTHH:mm" para el input datetime-local
+// 1. Para el input datetime-local (Tu función original, está perfecta)
 const formatDateToArgentinaInput = (date: Date | string | null | undefined) => {
   if (!date) return '';
   const d = new Date(date);
@@ -36,10 +36,23 @@ const formatDateToArgentinaInput = (date: Date | string | null | undefined) => {
   return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}`;
 };
 
-// 2. Convierte el string del input a una fecha ISO UTC correcta (acepta null/undefined para evitar errores de TS)
+// 2. Para guardar en la BD desde el input
 const parseArgentinaInputToDate = (inputValue: string | null | undefined): string | null => {
   if (!inputValue) return null;
   return new Date(`${inputValue}:00-03:00`).toISOString();
+};
+
+// 3. NUEVO: Para MOSTRAR la fecha en texto al usuario (Blindado para Argentina)
+const formatDisplayDate = (dateString: string) => {
+  return new Date(dateString).toLocaleString('es-AR', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -106,7 +119,6 @@ export default function CalendarioAulaPage() {
     }).then(async (result) => {
       if (result.isConfirmed && result.value) {
         try {
-          // ✅ Verificación explícita para que TypeScript sepa que startInput es string
           const startInput = result.value.startInput as string;
           const parsedStart = parseArgentinaInputToDate(startInput);
           
@@ -142,18 +154,20 @@ export default function CalendarioAulaPage() {
   const handleEventClick = (clickInfo: any) => {
     const event = clickInfo.event;
     
+    // 🔒 CORRECCIÓN: Usamos formatDisplayDate para que coincida exactamente con las alertas
     Swal.fire({
       title: event.title,
-      html: `<p><strong>Tipo:</strong> ${event.extendedProps?.type || 'General'}</p>
-             <p><strong>Inicio:</strong> ${new Date(event.start).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</p>
-             ${event.end ? `<p><strong>Fin:</strong> ${new Date(event.end).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</p>` : ''}`,
+      html: `
+        <p><strong>Tipo:</strong> ${event.extendedProps?.type || 'General'}</p>
+        <p><strong>Inicio:</strong> ${formatDisplayDate(event.start)}</p>
+        ${event.end ? `<p><strong>Fin:</strong> ${formatDisplayDate(event.end)}</p>` : ''}
+      `,
       background: '#0f172a', color: '#f1f5f9',
       showDenyButton: true, showCancelButton: true,
       confirmButtonText: '✏️ Editar', denyButtonText: '🗑️ Eliminar', cancelButtonText: 'Cerrar',
       confirmButtonColor: '#3b82f6', denyButtonColor: '#ef4444', cancelButtonColor: '#475569',
     }).then(async (result) => {
       
-      // --- LÓGICA DE EDICIÓN ---
       if (result.isConfirmed) {
         Swal.fire({
           title: 'Editar Evento',
@@ -179,7 +193,6 @@ export default function CalendarioAulaPage() {
         }).then(async (editResult) => {
           if (editResult.isConfirmed && editResult.value) {
             try {
-              // ✅ Verificación explícita para TypeScript
               const startInput = editResult.value.startInput as string;
               const startIso = parseArgentinaInputToDate(startInput);
               
@@ -210,7 +223,6 @@ export default function CalendarioAulaPage() {
           }
         });
 
-      // --- LÓGICA DE ELIMINACIÓN ---
       } else if (result.isDenied) {
         Swal.fire({
           title: '¿Estás seguro?',
@@ -246,7 +258,6 @@ export default function CalendarioAulaPage() {
     );
   }
 
-  
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

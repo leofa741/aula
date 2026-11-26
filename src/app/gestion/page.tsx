@@ -12,7 +12,8 @@ import {
   FaCog,
   FaArrowRight,
   FaUserGraduate,
-  FaCalendarAlt // ✅ 1. Agregamos el ícono del calendario
+  FaCalendarAlt,
+  FaVideo
 } from 'react-icons/fa';
 
 const theme = {
@@ -24,6 +25,77 @@ const theme = {
   accent: 'text-violet-400',
   gradient: 'from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20',
 };
+
+// ─────────────────────────────────────────────────────────────
+// 🕒 HELPER: Formato de tiempo relativo premium
+// ─────────────────────────────────────────────────────────────
+const getRelativeTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  
+  const timeStr = date.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  
+  if (diffHours < 0) return 'Finalizado';
+  if (diffHours < 1) return `En menos de 1 hora (${timeStr})`;
+  if (diffHours < 24) return `Hoy a las ${timeStr}`;
+  if (diffHours < 48) return `Mañana a las ${timeStr}`;
+  return date.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+// ─────────────────────────────────────────────────────────────
+// 🎴 COMPONENTE: Tarjeta de Alerta de Evento Premium
+// ─────────────────────────────────────────────────────────────
+function EventAlertCard({ event }: { event: any }) {
+  const isClase = event.type === 'clase';
+  const isReunion = event.type === 'reunion';
+  const isExamen = event.type === 'examen';
+
+  let borderColor = 'border-slate-700';
+  let bgColor = 'bg-slate-800/50';
+  let iconColor = 'text-slate-400';
+  let dotColor = 'bg-slate-400';
+  let Icon = FaCalendarAlt;
+
+  if (isClase) {
+    borderColor = 'border-violet-500/30';
+    bgColor = 'bg-violet-500/5';
+    iconColor = 'text-violet-400';
+    dotColor = 'bg-violet-400';
+    Icon = FaVideo;
+  } else if (isReunion) {
+    borderColor = 'border-emerald-500/30';
+    bgColor = 'bg-emerald-500/5';
+    iconColor = 'text-emerald-400';
+    dotColor = 'bg-emerald-400';
+    Icon = FaUsers;
+  } else if (isExamen) {
+    borderColor = 'border-rose-500/30';
+    bgColor = 'bg-rose-500/5';
+    iconColor = 'text-rose-400';
+    dotColor = 'bg-rose-400';
+    Icon = FaClipboardCheck;
+  }
+
+  return (
+    <div className={`relative flex items-center gap-4 p-4 rounded-xl border ${borderColor} ${bgColor} backdrop-blur-sm transition-all hover:scale-[1.02] hover:shadow-lg group`}>
+      <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-slate-900/50 ${iconColor}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h4 className="text-sm font-semibold text-white truncate">{event.title}</h4>
+        <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+          <span className={`w-1.5 h-1.5 rounded-full ${dotColor} animate-pulse`}></span>
+          {getRelativeTime(event.start)}
+        </p>
+      </div>
+      <Link href="/aula/calendario" className="p-2 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors" title="Ver calendario">
+        <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+      </Link>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // 🔹 Componente de Tarjeta de Módulo (Reutilizable)
@@ -75,13 +147,14 @@ export default function PanelGestionPage() {
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
+  
+  // ✅ Estado para las alertas de próximos eventos
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([]);
 
-  // ✅ 1. Montaje seguro
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 🔒 2. Validación de acceso
   useEffect(() => {
     const validateAccess = async () => {
       if (status === 'loading' || !mounted) return;
@@ -112,7 +185,36 @@ export default function PanelGestionPage() {
     validateAccess();
   }, [status, session, router, mounted]);
 
-  // ✅ 3. Loader de seguridad
+  // ✅ Cargar próximos eventos (próximas 48 horas)
+  useEffect(() => {
+    const fetchUpcomingEvents = async () => {
+      try {
+        const res = await fetch('/api/calendar/events');
+        if (res.ok) {
+          const data = await res.json();
+          const now = new Date();
+          const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+          
+          const filtered = data
+            .filter((e: any) => {
+              const startDate = new Date(e.start);
+              return startDate >= now && startDate <= in48Hours;
+            })
+            .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
+            .slice(0, 3); // Mostramos máximo los 3 próximos
+            
+          setUpcomingEvents(filtered);
+        }
+      } catch (error) {
+        console.error('Error cargando próximos eventos:', error);
+      }
+    };
+
+    if (isAuthorized) {
+      fetchUpcomingEvents();
+    }
+  }, [isAuthorized]);
+
   if (status === 'loading' || isAuthorized === null || !mounted) {
     return (
       <div className={`min-h-screen ${theme.bg} flex items-center justify-center`}>
@@ -123,9 +225,6 @@ export default function PanelGestionPage() {
 
   if (!isAuthorized) return null;
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ 4. Definición de Módulos por Rol
-  // ─────────────────────────────────────────────────────────────
   const userRole = session?.user?.role || 'alumno';
 
   const allModules = [
@@ -156,7 +255,6 @@ export default function PanelGestionPage() {
       available: true,
       roles: ["alumno", "profesor", "admin", "superadmin"]
     },
-    // ✅ 2. NUEVO MÓDULO: CALENDARIO
     {
       title: "Calendario de Clases",
       description: "Visualiza y agenda clases en vivo, reuniones y fechas importantes de tus cursos.",
@@ -164,7 +262,7 @@ export default function PanelGestionPage() {
       href: "/aula/calendario",
       color: "from-violet-600 to-fuchsia-600",
       available: true,
-      roles: ["alumno", "profesor", "admin", "superadmin"] // 👈 Visible para todos los roles
+      roles: ["alumno", "profesor", "admin", "superadmin"]
     },
     {
       title: "Catálogo de Cursos",
@@ -204,15 +302,10 @@ export default function PanelGestionPage() {
     }
   ];
 
-  // Filtramos los módulos que el usuario actual tiene permiso para ver
   const visibleModules = allModules.filter(module => module.roles.includes(userRole));
 
-  // ─────────────────────────────────────────────────────────────
-  // ✅ 5. Contenido Principal: Hub de Redirección
-  // ─────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
-      {/* Background decorativo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className={`absolute top-0 right-0 w-96 h-96 bg-gradient-to-br ${theme.gradient} rounded-full blur-3xl opacity-30`} />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-cyan-500/20 via-violet-500/20 to-fuchsia-500/20 rounded-full blur-3xl opacity-30" />
@@ -221,7 +314,7 @@ export default function PanelGestionPage() {
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
 
         {/* Header del Dashboard */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/60 border border-slate-700/50 mt-40 mb-4">
               <FaShieldAlt className="text-violet-400 text-xs" />
@@ -246,6 +339,24 @@ export default function PanelGestionPage() {
             Volver al sitio público
           </Link>
         </div>
+
+        {/* ✅ SECCIÓN DE ALERTAS Y PRÓXIMOS EVENTOS (Solo si hay eventos) */}
+        {upcomingEvents.length > 0 && (
+          <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <FaCalendarAlt className="text-amber-400" />
+              Próximos Eventos
+              <span className="text-xs font-normal text-slate-400 bg-slate-800 px-2.5 py-0.5 rounded-full border border-slate-700">
+                {upcomingEvents.length} en las próximas 48hs
+              </span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {upcomingEvents.map((event) => (
+                <EventAlertCard key={event.id} event={event} />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Grid de Módulos (Filtrado por rol) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

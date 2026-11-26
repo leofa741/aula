@@ -246,6 +246,7 @@ export default function CalendarioAulaPage() {
     );
   }
 
+  
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

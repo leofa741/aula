@@ -57,19 +57,16 @@ export default function HomePage() {
           <p className="text-slate-600 text-sm">
             ¿Consultas?{' '}
             <a 
-              href="mailto:info@atutiempo.com.ar" 
+              href="/contact" 
               className="text-amber-400/80 hover:text-amber-300 transition-colors duration-300 underline underline-offset-4 decoration-amber-500/30"
             >
-              info@atutiempo.com.ar
+              
             </a>
           </p>
         </div>
       </div>
  
-      {/* Footer minimalista */}
-      <div className="absolute bottom-6 text-slate-700 text-[10px] md:text-xs tracking-[0.2em] uppercase">
-        © {new Date().getFullYear()} A Tu Tiempo · Todos los derechos reservados
-      </div>
+    
     </div>
   );
 }

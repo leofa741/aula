@@ -55,7 +55,7 @@ export default function AulaVirtualPage() {
     <div className="relative min-h-screen bg-zinc-950 text-zinc-100 selection:bg-indigo-500/30 overflow-x-hidden">
       {/* Espaciado superior para no chocar con el navbar */}
       <div className="pt-24 sm:pt-32" />
-      
+
       {/* Fondo minimalista: glows sutiles en tonos índigo/violeta (académico/tech) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-[20%] right-0 w-[800px] h-[800px] bg-indigo-600/5 rounded-full blur-[150px]" />
@@ -63,24 +63,27 @@ export default function AulaVirtualPage() {
       </div>
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        
+
         {/* ═══════════════════════════════════════════════════════
             HERO SECTION - BIENVENIDA AL AULA
             ═══════════════════════════════════════════════════════ */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center mb-24 sm:mb-32 mt-40">
-          
+
           {/* Imagen limpia y elegante (Reemplaza la src con la de tu plataforma) */}
           <div className={`relative transition-all duration-1000 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div className="relative w-full h-80 sm:h-96 lg:h-[28rem] rounded-3xl overflow-hidden border border-zinc-800 shadow-lg shadow-indigo-900/20">
-              <Image
-                src="/Aula_Virtual__Aprender_es_Posible-removebg-preview.png" // 👈 CAMBIA ESTO por tu imagen (ej: un laptop elegante o foto del profesor)
-                alt="Vista previa del Aula Virtual"
-                fill
-                className="object-cover object-center"
-                priority
-              />
+              <div className="relative w-full h-[320px] md:h-[420px] flex items-center justify-center overflow-hidden">
+                <Image
+                  src="/Aula_Virtual__Aprender_es_Posible-removebg-preview.png"
+                  alt="Vista previa del Aula Virtual"
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-contain object-center p-4 md:p-8"
+                />
+              </div>
               <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/80 via-zinc-950/20 to-transparent" />
-              
+
               {/* Badge flotante elegante */}
               <div className="absolute bottom-6 left-6 right-6 p-4 rounded-xl bg-zinc-950/60 backdrop-blur-md border border-white/10">
                 <div className="flex items-center gap-3">
@@ -106,7 +109,7 @@ export default function AulaVirtualPage() {
             </div>
 
             <p className="text-lg text-zinc-400 leading-relaxed max-w-lg font-light">
-              Accede a un entorno de aprendizaje premium, sin distracciones. 
+              Accede a un entorno de aprendizaje premium, sin distracciones.
               Hemos curado cada módulo, recurso y clase en vivo para maximizar tu progreso.
             </p>
 
@@ -133,7 +136,7 @@ export default function AulaVirtualPage() {
                 <span>Ingresar al Aula</span>
                 <span className="group-hover:translate-x-1 transition-transform duration-300"><Icons.ArrowRight /></span>
               </Link>
-           
+
             </div>
           </div>
         </section>
@@ -169,8 +172,8 @@ export default function AulaVirtualPage() {
                 desc: 'Interactúa con tus compañeros y docentes en un entorno seguro y profesional.',
               }
             ].map((feature, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className={`group p-8 rounded-2xl bg-zinc-900/30 border border-zinc-800 hover:border-indigo-500/30 transition-all duration-500 hover:bg-zinc-900/60 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
                 style={{ transitionDelay: `${300 + index * 100}ms` }}
               >
@@ -191,7 +194,7 @@ export default function AulaVirtualPage() {
             ═══════════════════════════════════════════════════════ */}
         <section className="mb-24 sm:mb-32 relative rounded-3xl border border-zinc-800 bg-zinc-900/30 p-8 sm:p-16 overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
-          
+
           <div className="relative z-10 max-w-3xl mx-auto text-center space-y-8">
             <div className="flex justify-center">
               <Icons.Quote />
@@ -211,7 +214,7 @@ export default function AulaVirtualPage() {
           </div>
         </section>
 
-     
+
 
       </div>
     </div>

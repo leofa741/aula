@@ -51,4 +51,5 @@ export async function POST(req: NextRequest) {
         console.error('Error subiendo archivo:', error);
         return NextResponse.json({ error: 'Error interno al subir el archivo' }, { status: 500 });
     }
+    
 }

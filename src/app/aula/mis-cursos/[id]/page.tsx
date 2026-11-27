@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaVideo, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaLink, FaExternalLinkAlt as FaExtLink } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaVideo, FaFileAlt, FaExternalLinkAlt, FaLightbulb, FaCheckCircle, FaQuoteLeft, FaLink, FaExternalLinkAlt as FaExtLink, FaFilePdf } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = { bg: 'bg-slate-950', bgCard: 'bg-slate-900/80', border: 'border-slate-700/50', textPrimary: 'text-white', textSecondary: 'text-slate-400' };
@@ -14,7 +14,8 @@ interface Module {
   description: string;
   content: string;
   links: string[];
-  type: 'texto' | 'video' | 'enlace';
+  pdfs?: string[]; // ✅ Agregado para soportar PDFs
+  type: 'texto' | 'video' | 'enlace' | 'pdf'; // ✅ Agregado 'pdf'
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: string[];
@@ -144,7 +145,7 @@ export default function StudentCourseDetailPage() {
                 <div key={moduleId} className={`${theme.bgCard} border ${theme.border} rounded-xl p-6 hover:border-emerald-500/30 transition-colors`}>
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
-                      {module.type === 'video' ? <FaVideo className="text-red-500" /> : module.type === 'enlace' ? <FaLink className="text-blue-400" /> : <FaFileAlt className="text-slate-400" />}
+                      {module.type === 'video' ? <FaVideo className="text-red-500" /> : module.type === 'enlace' ? <FaLink className="text-blue-400" /> : module.type === 'pdf' ? <FaFilePdf className="text-rose-500" /> : <FaFileAlt className="text-slate-400" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -164,21 +165,69 @@ export default function StudentCourseDetailPage() {
                           <div className="p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap">{module.content}</div>
                         )}
                         
-                        {(module.type === 'video' || module.type === 'enlace') && module.links && module.links.length > 0 ? (
+                        {/* ✅ Renderizado de PDFs, Videos y Enlaces */}
+                        {(module.type === 'video' || module.type === 'enlace' || module.type === 'pdf') && (
                           <div className="space-y-2">
-                            {module.links.map((link: string, idx: number) => (
-                              <a key={idx} href={link} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${module.type === 'video' ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'}`}>
+                            {/* Renderizar PDFs */}
+                            {module.type === 'pdf' && module.pdfs && module.pdfs.length > 0 && (
+                              module.pdfs.map((pdfUrl: string, idx: number) => {
+                                const fileName = pdfUrl.split('/').pop() || 'documento.pdf';
+                                return (
+                                  <a 
+                                    key={idx} 
+                                    href={`/api/download?url=${encodeURIComponent(pdfUrl)}&filename=${encodeURIComponent(fileName)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all text-sm font-semibold w-full sm:w-auto"
+                                  >
+                                    <FaFilePdf className="w-4 h-4" />
+                                    Descargar PDF {(module.pdfs?.length ?? 0) > 1 ? idx + 1 : ''}
+                                  </a>
+                                );
+                              })
+                            )}
+
+                            {/* Renderizar Links (Video/Enlace) */}
+                            {(module.type === 'video' || module.type === 'enlace') && module.links && module.links.length > 0 && module.links.some((l: string) => l.trim() !== '') ? (
+                              module.links.filter((l: string) => l.trim() !== '').map((link: string, idx: number) => {
+                                const totalValid = module.links.filter((l: string) => l.trim() !== '').length;
+                                return (
+                                  <a 
+                                    key={idx} 
+                                    href={link} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
+                                      module.type === 'video' 
+                                        ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
+                                        : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                                    }`}
+                                  >
+                                    {module.type === 'video' ? <FaVideo className="w-4 h-4" /> : <FaExtLink className="w-4 h-4" />}
+                                    {module.type === 'video' 
+                                      ? `Ver Video ${totalValid > 1 ? idx + 1 : ''}` 
+                                      : `Abrir Enlace ${totalValid > 1 ? idx + 1 : ''}`
+                                    }
+                                  </a>
+                                );
+                              })
+                            ) : (module.type === 'video' || module.type === 'enlace') && module.content && module.content.trim().startsWith('http') ? (
+                              <a 
+                                href={module.content} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
+                                  module.type === 'video' 
+                                    ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
+                                    : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                                }`}
+                              >
                                 {module.type === 'video' ? <FaVideo className="w-4 h-4" /> : <FaExtLink className="w-4 h-4" />}
-                                {module.type === 'video' ? `Ver Video ${module.links.length > 1 ? idx + 1 : ''}` : `Abrir Enlace ${module.links.length > 1 ? idx + 1 : ''}`}
+                                {module.type === 'video' ? 'Ver Video' : 'Abrir Enlace Externo'}
                               </a>
-                            ))}
+                            ) : null}
                           </div>
-                        ) : (module.type === 'video' || module.type === 'enlace') && module.content ? (
-                          <a href={module.content} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold ${module.type === 'video' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
-                            {module.type === 'video' ? <FaVideo className="w-4 h-4" /> : <FaExtLink className="w-4 h-4" />}
-                            {module.type === 'video' ? 'Ver Video' : 'Abrir Enlace Externo'}
-                          </a>
-                        ) : null}
+                        )}
 
                         {/* Zona de Entrega del Alumno */}
                         {mySubmission ? (

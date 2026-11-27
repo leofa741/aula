@@ -22,7 +22,6 @@ const theme = {
 // 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
 // ─────────────────────────────────────────────────────────────
 
-// 1. Para el input datetime-local (Tu función original, está perfecta)
 const formatDateToArgentinaInput = (date: Date | string | null | undefined) => {
   if (!date) return '';
   const d = new Date(date);
@@ -36,22 +35,16 @@ const formatDateToArgentinaInput = (date: Date | string | null | undefined) => {
   return `${getPart('year')}-${getPart('month')}-${getPart('day')}T${getPart('hour')}:${getPart('minute')}`;
 };
 
-// 2. Para guardar en la BD desde el input
 const parseArgentinaInputToDate = (inputValue: string | null | undefined): string | null => {
   if (!inputValue) return null;
   return new Date(`${inputValue}:00-03:00`).toISOString();
 };
 
-// 3. NUEVO: Para MOSTRAR la fecha en texto al usuario (Blindado para Argentina)
 const formatDisplayDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
   });
 };
 
@@ -65,6 +58,19 @@ export default function CalendarioAulaPage() {
   
   const [events, setEvents] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ VALIDACIÓN DE SEGURIDAD: Si es alumno, redirigirlo inmediatamente
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (status === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (session?.user?.role === 'alumno') {
+      router.push('/aula/mis-cursos');
+      return;
+    }
+  }, [status, session, router]);
 
   const fetchEvents = async () => {
     try {
@@ -81,11 +87,11 @@ export default function CalendarioAulaPage() {
   };
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login');
-    if (status === 'authenticated') fetchEvents();
-  }, [status, router]);
+    if (status === 'authenticated' && session?.user?.role !== 'alumno') {
+      fetchEvents();
+    }
+  }, [status, session]);
 
-  // ✅ CREAR evento
   const handleDateClick = (arg: any) => {
     const defaultStart = arg.dateStr.includes('T') ? arg.dateStr : `${arg.dateStr}T08:00:00-03:00`;
     const startDate = new Date(defaultStart);
@@ -121,7 +127,6 @@ export default function CalendarioAulaPage() {
         try {
           const startInput = result.value.startInput as string;
           const parsedStart = parseArgentinaInputToDate(startInput);
-          
           if (!parsedStart) throw new Error('Fecha inválida');
 
           const endDate = new Date(new Date(parsedStart).getTime() + 60 * 60 * 1000).toISOString();
@@ -129,20 +134,13 @@ export default function CalendarioAulaPage() {
           const res = await fetch('/api/calendar/events', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: result.value.title,
-              type: result.value.type,
-              start: parsedStart,
-              end: endDate
-            })
+            body: JSON.stringify({ title: result.value.title, type: result.value.type, start: parsedStart, end: endDate })
           });
 
           if (res.ok) {
             await fetchEvents();
             Swal.fire({ icon: 'success', title: '¡Evento agendado!', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6', timer: 1500, showConfirmButton: false });
-          } else {
-            throw new Error('Error al guardar');
-          }
+          } else { throw new Error('Error al guardar'); }
         } catch (error) {
           Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo guardar el evento', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
         }
@@ -150,11 +148,9 @@ export default function CalendarioAulaPage() {
     });
   };
 
-  // ✅ EDITAR o ELIMINAR evento
   const handleEventClick = (clickInfo: any) => {
     const event = clickInfo.event;
     
-    // 🔒 CORRECCIÓN: Usamos formatDisplayDate para que coincida exactamente con las alertas
     Swal.fire({
       title: event.title,
       html: `
@@ -167,7 +163,6 @@ export default function CalendarioAulaPage() {
       confirmButtonText: '✏️ Editar', denyButtonText: '🗑️ Eliminar', cancelButtonText: 'Cerrar',
       confirmButtonColor: '#3b82f6', denyButtonColor: '#ef4444', cancelButtonColor: '#475569',
     }).then(async (result) => {
-      
       if (result.isConfirmed) {
         Swal.fire({
           title: 'Editar Evento',
@@ -195,7 +190,6 @@ export default function CalendarioAulaPage() {
             try {
               const startInput = editResult.value.startInput as string;
               const startIso = parseArgentinaInputToDate(startInput);
-              
               if (!startIso) throw new Error('Fecha inválida');
 
               const endIso = new Date(new Date(startIso).getTime() + 60 * 60 * 1000).toISOString();
@@ -203,20 +197,13 @@ export default function CalendarioAulaPage() {
               const res = await fetch(`/api/calendar/events/${event.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title: editResult.value.title,
-                  type: editResult.value.type,
-                  start: startIso,
-                  end: endIso
-                })
+                body: JSON.stringify({ title: editResult.value.title, type: editResult.value.type, start: startIso, end: endIso })
               });
 
               if (res.ok) {
                 await fetchEvents();
                 Swal.fire({ icon: 'success', title: '¡Evento actualizado!', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#8b5cf6', timer: 1500, showConfirmButton: false });
-              } else {
-                throw new Error('Error al actualizar');
-              }
+              } else { throw new Error('Error al actualizar'); }
             } catch (error) {
               Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo actualizar', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
             }
@@ -238,9 +225,7 @@ export default function CalendarioAulaPage() {
               if (res.ok) {
                 await fetchEvents();
                 Swal.fire({ icon: 'success', title: '¡Evento eliminado!', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#10b981', timer: 1500, showConfirmButton: false });
-              } else {
-                throw new Error('Error al eliminar');
-              }
+              } else { throw new Error('Error al eliminar'); }
             } catch (error) {
               Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo eliminar', background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#ef4444' });
             }
@@ -257,6 +242,9 @@ export default function CalendarioAulaPage() {
       </div>
     );
   }
+
+  // Si por alguna razón pasa la validación inicial pero no es autorizado, no mostrar nada
+  if (session?.user?.role === 'alumno') return null;
 
   return (
     <div className={`min-h-screen ${theme.bg} ${theme.textPrimary} relative`}>

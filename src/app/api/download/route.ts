@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   if (!url) {
     return NextResponse.json({ error: 'URL requerida' }, { status: 400 });
   }
+  
 
   try {
     // ✅ Agregamos headers de navegador para evitar que el firewall de Cloudinary bloquee la petición

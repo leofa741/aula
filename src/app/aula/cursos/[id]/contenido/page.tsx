@@ -3,7 +3,7 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { FaArrowLeft, FaSpinner, FaPlus, FaYoutube, FaFileAlt, FaTrash, FaExternalLinkAlt, FaEdit, FaCheckCircle, FaTimesCircle, FaUsers, FaLayerGroup, FaLink } from 'react-icons/fa';
+import { FaArrowLeft, FaSpinner, FaPlus, FaYoutube, FaFileAlt, FaFilePdf, FaTrash, FaExternalLinkAlt, FaEdit, FaCheckCircle, FaTimesCircle, FaUsers, FaLayerGroup, FaLink } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 
 const theme = { bg: 'bg-slate-950', bgCard: 'bg-slate-900/80', border: 'border-slate-700/50', textPrimary: 'text-white', textSecondary: 'text-slate-400' };
@@ -14,7 +14,8 @@ interface Module {
   description: string;
   content: string;
   links: string[];
-  type: 'texto' | 'video' | 'enlace';
+  pdfs?: string[]; // ✅ Agregado
+  type: 'texto' | 'video' | 'enlace' | 'pdf'; // ✅ Agregado 'pdf'
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: string[];
@@ -52,14 +53,18 @@ export default function CursoContenidoPage() {
   const [loading, setLoading] = useState(true);
   const [courseStudents, setCourseStudents] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({ 
-    title: '', description: '', content: '', type: 'texto' as 'texto' | 'video' | 'enlace', links: [''] 
+  const [formData, setFormData] = useState({
+    title: '', description: '', content: '', type: 'texto' as 'texto' | 'video' | 'enlace' | 'pdf', links: ['']
   });
   const [assignmentType, setAssignmentType] = useState<'todos' | 'especificos' | 'grupo'>('todos');
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [customGroupName, setCustomGroupName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
+
+  // ✅ Estados nuevos para manejo de archivos PDF
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [existingPdfs, setExistingPdfs] = useState<string[]>([]);
 
   const [submissions, setSubmissions] = useState<Record<string, Submission[]>>({});
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
@@ -91,12 +96,10 @@ export default function CursoContenidoPage() {
 
   useEffect(() => { if (status === 'authenticated' && courseId && isAuthorized) fetchData(); }, [status, courseId, isAuthorized]);
 
-   const fetchSubmissions = async (moduleId: string, forceRefresh = false) => {
-    // 🔒 CORRECCIÓN: La clave de caché ahora incluye el courseId para evitar mezclas
+  const fetchSubmissions = async (moduleId: string, forceRefresh = false) => {
     const cacheKey = `${courseId}-${moduleId}`;
-    
     if (!forceRefresh && submissions[cacheKey]) return;
-    
+
     setLoadingSubmissions(true);
     try {
       const res = await fetch(`/api/courses/${courseId}/modules/${moduleId}/submissions`);
@@ -125,13 +128,15 @@ export default function CursoContenidoPage() {
   };
 
   const handleEdit = (module: Module) => {
-    setFormData({ 
-      title: module.title, 
-      description: module.description, 
-      content: module.content, 
+    setFormData({
+      title: module.title,
+      description: module.description,
+      content: module.content,
       type: module.type,
       links: module.links && module.links.length > 0 ? module.links : ['']
     });
+    setExistingPdfs(module.pdfs || []); // ✅ Cargar PDFs existentes
+    setPdfFiles([]); // ✅ Limpiar nuevos archivos
     setAssignmentType(module.assignmentType || 'todos');
     setSelectedStudentIds(module.assignedStudentIds?.map(String) || []);
     setCustomGroupName(module.customGroupName || '');
@@ -147,6 +152,8 @@ export default function CursoContenidoPage() {
         if (res.ok) {
           if (editingModuleId === moduleId) {
             setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] });
+            setExistingPdfs([]);
+            setPdfFiles([]);
             setEditingModuleId(null);
           }
           fetchData();
@@ -164,9 +171,28 @@ export default function CursoContenidoPage() {
       if (selectedStudentIds.length > 0 && assignmentType === 'todos') finalAssignmentType = customGroupName ? 'grupo' : 'especificos';
       else if (selectedStudentIds.length === 0) finalAssignmentType = 'todos';
 
+      let finalPdfs = [...existingPdfs];
+
+      // ✅ Subir nuevos archivos PDF a Cloudinary a través de tu API
+      if (formData.type === 'pdf' && pdfFiles.length > 0) {
+        for (const file of pdfFiles) {
+          const formDataUpload = new FormData();
+          formDataUpload.append('file', file);
+
+          const uploadRes = await fetch('/api/upload', { method: 'POST', body: formDataUpload });
+          if (!uploadRes.ok) {
+            const err = await uploadRes.json();
+            throw new Error(err.error || `Error al subir el archivo: ${file.name}`);
+          }
+          const data = await uploadRes.json();
+          finalPdfs.push(data.url);
+        }
+      }
+
       const payload = {
         ...formData,
-        links: formData.links.filter(l => l.trim() !== ''),
+        links: (formData.type === 'enlace' || formData.type === 'video') ? formData.links.filter(l => l.trim() !== '') : [],
+        pdfs: finalPdfs, // ✅ Enviamos los PDFs
         assignmentType: finalAssignmentType,
         assignedStudentIds: (finalAssignmentType === 'especificos' || finalAssignmentType === 'grupo') ? selectedStudentIds : [],
         customGroupName: finalAssignmentType === 'grupo' ? customGroupName : undefined,
@@ -178,6 +204,8 @@ export default function CursoContenidoPage() {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.ok) {
         setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] });
+        setExistingPdfs([]);
+        setPdfFiles([]);
         setEditingModuleId(null);
         setAssignmentType('todos');
         setSelectedStudentIds([]);
@@ -241,10 +269,15 @@ export default function CursoContenidoPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Tipo de Contenido *</label>
-                    <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value as any, links: [''] })} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
+                    <select value={formData.type} onChange={(e) => {
+                      const newType = e.target.value as any;
+                      setFormData({ ...formData, type: newType, links: [''] });
+                      setPdfFiles([]); // Limpiar archivos al cambiar de tipo
+                    }} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm">
                       <option value="texto">📝 Texto / Instrucciones</option>
                       <option value="video">🎥 Enlace(s) de Video</option>
                       <option value="enlace">🔗 Enlace(s) Externo(s)</option>
+                      <option value="pdf">📄 Archivo(s) PDF</option> {/* ✅ Nueva opción */}
                     </select>
                   </div>
 
@@ -273,10 +306,64 @@ export default function CursoContenidoPage() {
                     )}
                   </div>
 
+                  {/* ✅ RENDERIZADO CONDICIONAL DEL INPUT */}
                   {formData.type === 'texto' ? (
                     <div>
                       <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Contenido (Texto) *</label>
                       <textarea value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} required rows={4} className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm resize-none" placeholder="Escribe las instrucciones..." />
+                    </div>
+                  ) : formData.type === 'pdf' ? (
+                    <div>
+                      <label className="block text-xs font-medium uppercase tracking-wider text-slate-400 mb-1.5">Archivos PDF *</label>
+
+                      {existingPdfs.length > 0 && (
+                        <div className="mb-3 space-y-2">
+                          <p className="text-[10px] text-slate-500 uppercase">Archivos ya guardados:</p>
+                          {existingPdfs.map((pdfUrl, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg text-xs">
+                              <span className="text-emerald-400 truncate flex-1 flex items-center gap-2">
+                                <FaCheckCircle className="w-3 h-3" /> {pdfUrl.split('/').pop() || 'documento.pdf'}
+                              </span>
+                              <button type="button" onClick={() => setExistingPdfs(existingPdfs.filter((_, i) => i !== idx))} className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors">
+                                <FaTrash className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        multiple
+                        onChange={(e) => {
+                          // ✅ CORRECCIÓN TYPESCRIPT: Extraemos los archivos a una variable local segura
+                          if (e.target.files && e.target.files.length > 0) {
+                            const newFiles: File[] = [];
+                            for (let i = 0; i < e.target.files.length; i++) {
+                              newFiles.push(e.target.files[i]);
+                            }
+                            setPdfFiles(prev => [...prev, ...newFiles]);
+                          }
+                        }}
+                        className="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-500"
+                      />
+
+                      {pdfFiles.length > 0 && (
+                        <div className="space-y-2 mt-3">
+                          <p className="text-[10px] text-slate-500 uppercase">Nuevos archivos a subir:</p>
+                          {pdfFiles.map((file, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-sm">
+                              <span className="text-slate-300 truncate flex-1 flex items-center gap-2">
+                                <FaFileAlt className="text-violet-400" /> {file.name}
+                              </span>
+                              <button type="button" onClick={() => setPdfFiles(prev => prev.filter((_, i) => i !== idx))} className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors">
+                                <FaTrash className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div>
@@ -285,17 +372,17 @@ export default function CursoContenidoPage() {
                       </label>
                       {formData.links.map((link, index) => (
                         <div key={index} className="flex gap-2 mb-2">
-                          <input 
-                            type="url" 
-                            value={link} 
+                          <input
+                            type="url"
+                            value={link}
                             onChange={(e) => {
                               const newLinks = [...formData.links];
                               newLinks[index] = e.target.value;
                               setFormData({ ...formData, links: newLinks });
-                            }} 
-                            required 
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm" 
-                            placeholder="https://..." 
+                            }}
+                            required
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm"
+                            placeholder="https://..."
                           />
                           {formData.links.length > 1 && (
                             <button type="button" onClick={() => setFormData({ ...formData, links: formData.links.filter((_, i) => i !== index) })} className="px-3 py-2 rounded-lg bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 transition-colors">
@@ -315,7 +402,7 @@ export default function CursoContenidoPage() {
                       {submitting ? <FaSpinner className="animate-spin" /> : (editingModuleId ? <FaEdit /> : <FaPlus />)}
                       {submitting ? 'Guardando...' : (editingModuleId ? 'Actualizar' : 'Agregar')}
                     </button>
-                    {editingModuleId && <button type="button" onClick={() => { setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] }); setEditingModuleId(null); }} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">Cancelar</button>}
+                    {editingModuleId && <button type="button" onClick={() => { setFormData({ title: '', description: '', content: '', type: 'texto', links: [''] }); setExistingPdfs([]); setPdfFiles([]); setEditingModuleId(null); }} className="px-4 py-2.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700">Cancelar</button>}
                   </div>
                 </form>
               </div>
@@ -329,17 +416,14 @@ export default function CursoContenidoPage() {
             ) : (
               modules.map((module) => {
                 const moduleId = module._id || String(module.order);
-               const moduleSubmissions = submissions[`${courseId}-${moduleId}`] || [];
-                
-                // 🔍 DEBUG: Verifica en la consola del navegador (F12) si los enlaces llegan desde la API
-                console.log(`Módulo ${module.order} links:`, module.links);
+                const moduleSubmissions = submissions[`${courseId}-${moduleId}`] || [];
 
                 return (
                   <div key={moduleId} className={`${theme.bgCard} border ${theme.border} rounded-xl p-5 hover:border-violet-500/30 transition-colors group`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-4 flex-1">
                         <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-xl flex-shrink-0 border border-slate-700">
-                          {module.type === 'video' ? <FaYoutube className="text-red-500" /> : module.type === 'enlace' ? <FaLink className="text-blue-400" /> : <FaFileAlt className="text-slate-400" />}
+                          {module.type === 'video' ? <FaYoutube className="text-red-500" /> : module.type === 'enlace' ? <FaLink className="text-blue-400" /> : module.type === 'pdf' ? <FaFilePdf className="text-rose-500" /> : <FaFileAlt className="text-slate-400" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -356,65 +440,72 @@ export default function CursoContenidoPage() {
                           <h4 className="text-white font-semibold mb-1">{module.title}</h4>
                           {module.description && <p className="text-sm text-slate-400 mb-2">{module.description}</p>}
 
-                                                  {/* ✅ RENDERIZADO DE CONTENIDO 100% A PRUEBA DE FALLOS */}
+                          {/* ✅ RENDERIZADO DE CONTENIDO ACTUALIZADO */}
                           <div className="mt-3 space-y-3">
-                            {/* 1. Si es texto y hay contenido, mostrarlo */}
                             {module.type === 'texto' && module.content && module.content.trim() !== '' && (
                               <div className="p-4 rounded-lg bg-slate-950/50 border border-slate-800 text-sm text-slate-300 whitespace-pre-wrap">
                                 {module.content}
                               </div>
                             )}
-                            
-                            {/* 2. Lógica principal para Videos y Enlaces */}
-                            {(module.type === 'video' || module.type === 'enlace') && (
+
+                            {(module.type === 'video' || module.type === 'enlace' || module.type === 'pdf') && (
                               <div className="space-y-2">
-                                {/* Opción A: El nuevo formato con array de links */}
-                                {module.links && module.links.length > 0 && module.links.some((l: string) => l.trim() !== '') ? (
+                                {/* Renderizar PDFs */}
+                                {module.type === 'pdf' && module.pdfs && module.pdfs.length > 0 && (
+                                  module.pdfs.map((pdfUrl: string, idx: number) => {
+                                    const fileName = pdfUrl.split('/').pop() || 'documento.pdf';
+                                    return (
+                                      <a
+                                        key={idx}
+                                        href={`/api/download?url=${encodeURIComponent(pdfUrl)}&filename=${encodeURIComponent(fileName)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border bg-rose-500/10 border-rose-500/20 text-rose-400 hover:bg-rose-500/20 transition-all text-sm font-semibold w-full sm:w-auto"
+                                      >
+                                        <FaFilePdf className="w-4 h-4" />
+                                        Descargar PDF {(module.pdfs?.length ?? 0) > 1 ? idx + 1 : ''}
+                                      </a>
+                                    );
+                                  })
+                                )}
+
+                                {/* Renderizar Links (Video/Enlace) */}
+                                {(module.type === 'video' || module.type === 'enlace') && module.links && module.links.length > 0 && module.links.some((l: string) => l.trim() !== '') ? (
                                   module.links.filter((l: string) => l.trim() !== '').map((link: string, idx: number) => {
                                     const totalValid = module.links.filter((l: string) => l.trim() !== '').length;
                                     return (
-                                      <a 
-                                        key={idx} 
-                                        href={link} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
-                                          module.type === 'video' 
-                                            ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
+                                      <a
+                                        key={idx}
+                                        href={link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${module.type === 'video'
+                                            ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'
                                             : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
-                                        }`}
+                                          }`}
                                       >
                                         {module.type === 'video' ? <FaYoutube className="w-4 h-4" /> : <FaExternalLinkAlt className="w-4 h-4" />}
-                                        {module.type === 'video' 
-                                          ? `Ver Video ${totalValid > 1 ? idx + 1 : ''}` 
+                                        {module.type === 'video'
+                                          ? `Ver Video ${totalValid > 1 ? idx + 1 : ''}`
                                           : `Abrir Enlace ${totalValid > 1 ? idx + 1 : ''}`
                                         }
                                       </a>
                                     );
                                   })
-                                ) : (
-                                  /* Opción B: Fallback para cuando la URL está guardada en 'content' (como en tu BD actual) */
-                                  module.content && module.content.trim().startsWith('http') ? (
-                                    <a 
-                                      href={module.content} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer" 
-                                      className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${
-                                        module.type === 'video' 
-                                          ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' 
-                                          : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
+                                ) : (module.type === 'video' || module.type === 'enlace') && module.content && module.content.trim().startsWith('http') ? (
+                                  <a
+                                    href={module.content}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-sm font-semibold w-full sm:w-auto ${module.type === 'video'
+                                        ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'
+                                        : 'bg-blue-500/10 border-blue-500/20 text-blue-400 hover:bg-blue-500/20'
                                       }`}
-                                    >
-                                      {module.type === 'video' ? <FaYoutube className="w-4 h-4" /> : <FaExternalLinkAlt className="w-4 h-4" />}
-                                      {module.type === 'video' ? 'Ver Video' : 'Abrir Enlace Externo'}
-                                    </a>
-                                  ) : (
-                                    /* Opción C: Aviso si el módulo está realmente vacío */
-                                    <p className="text-xs text-rose-400 italic flex items-center gap-1">
-                                      ⚠️ Este módulo no tiene enlaces configurados. Edítalo para agregar uno.
-                                    </p>
-                                  )
-                                )}
+                                  >
+                                    {module.type === 'video' ? <FaYoutube className="w-4 h-4" /> : <FaExternalLinkAlt className="w-4 h-4" />}
+                                    {module.type === 'video' ? 'Ver Video' : 'Abrir Enlace Externo'}
+                                  </a>
+                                ) : null}
                               </div>
                             )}
                           </div>

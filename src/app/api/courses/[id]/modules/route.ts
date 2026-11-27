@@ -21,21 +21,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!isOwner && !isAdmin) return NextResponse.json({ error: 'No tienes permiso' }, { status: 403 });
 
     const body = await req.json();
-    
-    // ✅ 1. EXTRAER 'links' DEL BODY QUE ENVÍA EL FRONTEND
-    const { title, description, content, type, links, assignmentType, assignedStudentIds, customGroupName } = body;
+    const { title, description, content, type, links, pdfs, assignmentType, assignedStudentIds, customGroupName } = body;
 
     if (!title) return NextResponse.json({ error: 'El título es obligatorio' }, { status: 400 });
 
     const nextOrder = course.modules.length > 0 ? Math.max(...course.modules.map((m: any) => m.order)) + 1 : 1;
 
-    // ✅ 2. GUARDAR 'links' EN LA BASE DE DATOS
     course.modules.push({
       title,
       description: description || '',
       content: content || '',
       type: type || 'texto',
-      links: links || [], // <-- ¡AQUÍ SE GUARDA EL ARRAY DE ENLACES!
+      links: links || [],
+      pdfs: pdfs || [], // ✅ Guardamos los PDFs
       order: nextOrder,
       assignmentType: assignmentType || 'todos',
       assignedStudentIds: assignedStudentIds || [],
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 }
 
-// ✅ GET: Obtener módulos (Este ya funciona bien, trae todo el objeto module incluyendo links)
+// ✅ GET: Obtener módulos
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -80,19 +78,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!isOwner && !isAdmin) return NextResponse.json({ error: 'No tienes permiso' }, { status: 403 });
 
     const body = await req.json();
-    
-    // ✅ 3. EXTRAER 'links' DEL BODY AL EDITAR
-    const { title, description, content, type, links, assignmentType, assignedStudentIds, customGroupName } = body;
+    const { title, description, content, type, links, pdfs, assignmentType, assignedStudentIds, customGroupName } = body;
 
     const module = course.modules.id(moduleId);
     if (!module) return NextResponse.json({ error: 'Módulo no encontrado' }, { status: 404 });
 
-    // ✅ 4. ACTUALIZAR 'links' EN LA BASE DE DATOS
     module.title = title;
     module.description = description || '';
     module.content = content || '';
     module.type = type || 'texto';
-    module.links = links || []; // <-- ¡AQUÍ SE ACTUALIZA EL ARRAY DE ENLACES!
+    module.links = links || [];
+    module.pdfs = pdfs || []; // ✅ Actualizamos los PDFs
     
     if (assignmentType !== undefined) module.assignmentType = assignmentType;
     if (assignedStudentIds !== undefined) module.assignedStudentIds = assignedStudentIds;
@@ -106,7 +102,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 }
 
-// ✅ DELETE: Eliminar módulo y sus entregas fantasma
+// ✅ DELETE: Eliminar módulo y sus entregas
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; moduleId: string }> }) {
   try {
     await connectDB();
@@ -127,7 +123,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const oldOrder = moduleToDelete.order;
     course.modules.pull({ _id: moduleId });
     
-    // Eliminar entregas asociadas para evitar el bug del "módulo fantasma aprobado"
     await Submission.deleteMany({ moduleId: String(oldOrder) });
 
     course.modules.forEach((m: any, index: number) => { m.order = index + 1; });

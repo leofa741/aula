@@ -30,38 +30,29 @@ const theme = {
 // 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
 // ─────────────────────────────────────────────────────────────
 
-// 1. Para MOSTRAR la fecha completa en texto (Blindado para Argentina)
 const formatDisplayDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: false
   });
 };
 
-// 2. Lógica infalible para calcular "Hoy", "Mañana", etc.
 const getRelativeTime = (dateString: string) => {
   const eventDate = new Date(dateString);
   const now = new Date();
 
-  // Usamos 'en-CA' porque siempre devuelve el formato AAAA-MM-DD HH:MM:SS, fácil de separar
   const eventAR = eventDate.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
   const nowAR = now.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
 
-  const eventDay = eventAR.split(' ')[0]; // "2026-11-27"
-  const nowDay = nowAR.split(' ')[0];     // "2026-11-27"
+  const eventDay = eventAR.split(' ')[0];
+  const nowDay = nowAR.split(' ')[0];
   
-  const eventTimeFull = eventAR.split(' ')[1]; // "15:30:00"
-  const nowTimeFull = nowAR.split(' ')[1];     // "14:00:00"
+  const eventTimeFull = eventAR.split(' ')[1];
+  const nowTimeFull = nowAR.split(' ')[1];
   
-  const timeStr = eventTimeFull.substring(0, 5); // "15:30"
-  const nowTimeStr = nowTimeFull.substring(0, 5);
+  const timeStr = eventTimeFull.substring(0, 5);
 
-  // Si es el mismo día
   if (eventDay === nowDay) {
     const eventMinutes = parseInt(eventTimeFull.split(':')[0], 10) * 60 + parseInt(eventTimeFull.split(':')[1], 10);
     const nowMinutes = parseInt(nowTimeFull.split(':')[0], 10) * 60 + parseInt(nowTimeFull.split(':')[1], 10);
@@ -72,16 +63,11 @@ const getRelativeTime = (dateString: string) => {
     return `Hoy a las ${timeStr}`;
   }
 
-  // Calcular diferencia de días de forma segura
   const d1 = new Date(eventDay + 'T00:00:00');
   const d2 = new Date(nowDay + 'T00:00:00');
   const diffDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays === 1) {
-    return `Mañana a las ${timeStr}`;
-  }
-
-  // Si es más de 1 día, devolvemos la fecha completa formateada
+  if (diffDays === 1) return `Mañana a las ${timeStr}`;
   return formatDisplayDate(dateString);
 };
 
@@ -100,23 +86,11 @@ function EventAlertCard({ event }: { event: any }) {
   let Icon = FaCalendarAlt;
 
   if (isClase) {
-    borderColor = 'border-violet-500/30';
-    bgColor = 'bg-violet-500/5';
-    iconColor = 'text-violet-400';
-    dotColor = 'bg-violet-400';
-    Icon = FaVideo;
+    borderColor = 'border-violet-500/30'; bgColor = 'bg-violet-500/5'; iconColor = 'text-violet-400'; dotColor = 'bg-violet-400'; Icon = FaVideo;
   } else if (isReunion) {
-    borderColor = 'border-emerald-500/30';
-    bgColor = 'bg-emerald-500/5';
-    iconColor = 'text-emerald-400';
-    dotColor = 'bg-emerald-400';
-    Icon = FaUsers;
+    borderColor = 'border-emerald-500/30'; bgColor = 'bg-emerald-500/5'; iconColor = 'text-emerald-400'; dotColor = 'bg-emerald-400'; Icon = FaUsers;
   } else if (isExamen) {
-    borderColor = 'border-rose-500/30';
-    bgColor = 'bg-rose-500/5';
-    iconColor = 'text-rose-400';
-    dotColor = 'bg-rose-400';
-    Icon = FaClipboardCheck;
+    borderColor = 'border-rose-500/30'; bgColor = 'bg-rose-500/5'; iconColor = 'text-rose-400'; dotColor = 'bg-rose-400'; Icon = FaClipboardCheck;
   }
 
   return (
@@ -163,15 +137,8 @@ function ModuleCard({ title, description, icon, href, color, available }: Module
       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${color} flex items-center justify-center text-white mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
         {icon}
       </div>
-
-      <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-300 transition-colors">
-        {title}
-      </h3>
-
-      <p className="text-sm text-slate-400 leading-relaxed mb-4 flex-grow">
-        {description}
-      </p>
-
+      <h3 className="text-lg font-bold text-white mb-2 group-hover:text-violet-300 transition-colors">{title}</h3>
+      <p className="text-sm text-slate-400 leading-relaxed mb-4 flex-grow">{description}</p>
       <div className="flex items-center gap-2 text-sm font-medium text-violet-400 group-hover:text-violet-300 transition-colors">
         {available ? 'Acceder al módulo' : 'Próximamente'}
         {available && <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
@@ -212,8 +179,13 @@ export default function PanelGestionPage() {
     validateAccess();
   }, [status, session, router, mounted]);
 
+  const userRole = session?.user?.role || 'alumno';
+
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
+      // ✅ CORRECCIÓN: No cargar eventos si el usuario es alumno
+      if (userRole === 'alumno') return; 
+      
       try {
         const res = await fetch('/api/calendar/events');
         if (res.ok) {
@@ -237,7 +209,7 @@ export default function PanelGestionPage() {
     };
 
     if (isAuthorized) fetchUpcomingEvents();
-  }, [isAuthorized]);
+  }, [isAuthorized, userRole]);
 
   if (status === 'loading' || isAuthorized === null || !mounted) {
     return (
@@ -249,13 +221,12 @@ export default function PanelGestionPage() {
 
   if (!isAuthorized) return null;
 
-  const userRole = session?.user?.role || 'alumno';
-
   const allModules = [
     { title: "Gestión de Usuarios", description: "Administra alumnos, profesores y roles del sistema.", icon: <FaUsers className="w-6 h-6" />, href: "/admin", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["admin", "superadmin"] },
     { title: "Cursos y Materias", description: "Crea y administra tus cursos y revisa a tus alumnos.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["admin", "superadmin", "profesor"] },
     { title: "Mis Cursos", description: "Accede a las clases en vivo, materiales y tareas.", icon: <FaUserGraduate className="w-6 h-6" />, href: "/aula/mis-cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
-    { title: "Calendario de Clases", description: "Visualiza y agenda clases, reuniones y fechas importantes.", icon: <FaCalendarAlt className="w-6 h-6" />, href: "/aula/calendario", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
+    // ✅ CORRECCIÓN: Eliminado "alumno" de los roles permitidos para el calendario
+    { title: "Calendario de Clases", description: "Visualiza y agenda clases, reuniones y fechas importantes.", icon: <FaCalendarAlt className="w-6 h-6" />, href: "/aula/calendario", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["profesor", "admin", "superadmin"] },
     { title: "Catálogo de Cursos", description: "Explora los cursos disponibles e inscríbete.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos-disponibles", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno"] },
     { title: "Ide y Compilador en la Nube", description: "Escribe, compila y ejecuta código en tu navegador.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/ide", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
     { title: "Tareas y Calificaciones", description: "Revisa entregas de alumnos y gestiona calificaciones.", icon: <FaClipboardCheck className="w-6 h-6" />, href: "/aula/tareas", color: "from-amber-500 to-orange-600", available: false, roles: ["alumno", "profesor", "admin", "superadmin"] },
@@ -292,7 +263,8 @@ export default function PanelGestionPage() {
           </Link>
         </div>
 
-        {upcomingEvents.length > 0 && (
+        {/* ✅ CORRECCIÓN: Solo mostrar alertas si el usuario NO es alumno */}
+        {upcomingEvents.length > 0 && userRole !== 'alumno' && (
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
               <FaCalendarAlt className="text-amber-400" />

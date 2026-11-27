@@ -5,7 +5,8 @@ export interface IModule {
   description: string;
   content: string;
   links: string[];
-  type: 'texto' | 'video' | 'enlace';
+  pdfs: string[]; // ✅ NUEVO: Array para URLs de archivos PDF subidos
+  type: 'texto' | 'video' | 'enlace' | 'pdf'; // ✅ Agregado 'pdf'
   order: number;
   assignmentType?: 'todos' | 'especificos' | 'grupo';
   assignedStudentIds?: mongoose.Types.ObjectId[];
@@ -30,7 +31,8 @@ const ModuleSchema = new Schema<IModule>({
   description: { type: String, default: '' },
   content: { type: String, default: '' },
   links: [{ type: String }],
-  type: { type: String, enum: ['texto', 'video', 'enlace'], default: 'texto' },
+  pdfs: [{ type: String }], // ✅ NUEVO
+  type: { type: String, enum: ['texto', 'video', 'enlace', 'pdf'], default: 'texto' }, // ✅ Agregado 'pdf'
   order: { type: Number, required: true },
   assignmentType: { type: String, enum: ['todos', 'especificos', 'grupo'], default: 'todos' },
   assignedStudentIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],

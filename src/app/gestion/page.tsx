@@ -30,7 +30,7 @@ const theme = {
 // 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
 // ─────────────────────────────────────────────────────────────
 
-// 1. Para MOSTRAR la fecha en texto al usuario (Blindado para Argentina)
+// 1. Para MOSTRAR la fecha completa en texto (Blindado para Argentina)
 const formatDisplayDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -43,25 +43,45 @@ const formatDisplayDate = (dateString: string) => {
   });
 };
 
-// 2. Para calcular el tiempo relativo en las alertas
+// 2. Lógica infalible para calcular "Hoy", "Mañana", etc.
 const getRelativeTime = (dateString: string) => {
-  const dateStrAR = new Date(dateString).toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
-  const nowStrAR = new Date().toLocaleString('en-US', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const eventDate = new Date(dateString);
+  const now = new Date();
+
+  // Usamos 'en-CA' porque siempre devuelve el formato AAAA-MM-DD HH:MM:SS, fácil de separar
+  const eventAR = eventDate.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+  const nowAR = now.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
+
+  const eventDay = eventAR.split(' ')[0]; // "2026-11-27"
+  const nowDay = nowAR.split(' ')[0];     // "2026-11-27"
   
-  const dateObj = new Date(dateStrAR);
-  const nowObj = new Date(nowStrAR);
+  const eventTimeFull = eventAR.split(' ')[1]; // "15:30:00"
+  const nowTimeFull = nowAR.split(' ')[1];     // "14:00:00"
   
-  const diffMs = dateObj.getTime() - nowObj.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-  
-  // Extraemos solo la hora de la función de visualización unificada
-  const timeStr = formatDisplayDate(dateString).split(', ')[1]; 
-  
-  if (diffHours < 0) return 'Finalizado';
-  if (diffHours < 1) return `En menos de 1 hora (${timeStr})`;
-  if (diffHours < 24) return `Hoy a las ${timeStr}`;
-  if (diffHours < 48) return `Mañana a las ${timeStr}`;
-  
+  const timeStr = eventTimeFull.substring(0, 5); // "15:30"
+  const nowTimeStr = nowTimeFull.substring(0, 5);
+
+  // Si es el mismo día
+  if (eventDay === nowDay) {
+    const eventMinutes = parseInt(eventTimeFull.split(':')[0], 10) * 60 + parseInt(eventTimeFull.split(':')[1], 10);
+    const nowMinutes = parseInt(nowTimeFull.split(':')[0], 10) * 60 + parseInt(nowTimeFull.split(':')[1], 10);
+    
+    const diff = eventMinutes - nowMinutes;
+    if (diff < 0) return 'Finalizado';
+    if (diff < 60) return `En menos de 1 hora (${timeStr})`;
+    return `Hoy a las ${timeStr}`;
+  }
+
+  // Calcular diferencia de días de forma segura
+  const d1 = new Date(eventDay + 'T00:00:00');
+  const d2 = new Date(nowDay + 'T00:00:00');
+  const diffDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 1) {
+    return `Mañana a las ${timeStr}`;
+  }
+
+  // Si es más de 1 día, devolvemos la fecha completa formateada
   return formatDisplayDate(dateString);
 };
 

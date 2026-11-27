@@ -13,7 +13,8 @@ import {
   FaArrowRight,
   FaUserGraduate,
   FaCalendarAlt,
-  FaVideo
+  FaVideo,
+  FaLightbulb // ✅ Agregado
 } from 'react-icons/fa';
 
 const theme = {
@@ -26,10 +27,7 @@ const theme = {
   gradient: 'from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20',
 };
 
-// ─────────────────────────────────────────────────────────────
-// 🕒 HELPERS DE ZONA HORARIA (ARGENTINA UTC-3)
-// ─────────────────────────────────────────────────────────────
-
+// ... (Mantén tus funciones formatDisplayDate y getRelativeTime aquí igual que las tenías) ...
 const formatDisplayDate = (dateString: string) => {
   return new Date(dateString).toLocaleString('es-AR', {
     timeZone: 'America/Argentina/Buenos_Aires',
@@ -41,39 +39,29 @@ const formatDisplayDate = (dateString: string) => {
 const getRelativeTime = (dateString: string) => {
   const eventDate = new Date(dateString);
   const now = new Date();
-
   const eventAR = eventDate.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
   const nowAR = now.toLocaleString('en-CA', { timeZone: 'America/Argentina/Buenos_Aires' });
-
   const eventDay = eventAR.split(' ')[0];
   const nowDay = nowAR.split(' ')[0];
-  
   const eventTimeFull = eventAR.split(' ')[1];
   const nowTimeFull = nowAR.split(' ')[1];
-  
   const timeStr = eventTimeFull.substring(0, 5);
 
   if (eventDay === nowDay) {
     const eventMinutes = parseInt(eventTimeFull.split(':')[0], 10) * 60 + parseInt(eventTimeFull.split(':')[1], 10);
     const nowMinutes = parseInt(nowTimeFull.split(':')[0], 10) * 60 + parseInt(nowTimeFull.split(':')[1], 10);
-    
     const diff = eventMinutes - nowMinutes;
     if (diff < 0) return 'Finalizado';
     if (diff < 60) return `En menos de 1 hora (${timeStr})`;
     return `Hoy a las ${timeStr}`;
   }
-
   const d1 = new Date(eventDay + 'T00:00:00');
   const d2 = new Date(nowDay + 'T00:00:00');
   const diffDays = Math.round((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
-
   if (diffDays === 1) return `Mañana a las ${timeStr}`;
   return formatDisplayDate(dateString);
 };
 
-// ─────────────────────────────────────────────────────────────
-// 🎴 COMPONENTE: Tarjeta de Alerta de Evento Premium
-// ─────────────────────────────────────────────────────────────
 function EventAlertCard({ event }: { event: any }) {
   const isClase = event.type === 'clase';
   const isReunion = event.type === 'reunion';
@@ -112,9 +100,6 @@ function EventAlertCard({ event }: { event: any }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 🔹 Componente de Tarjeta de Módulo (Reutilizable)
-// ─────────────────────────────────────────────────────────────
 interface ModuleCardProps {
   title: string;
   description: string;
@@ -147,9 +132,6 @@ function ModuleCard({ title, description, icon, href, color, available }: Module
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// 🔹 Componente Principal
-// ─────────────────────────────────────────────────────────────
 export default function PanelGestionPage() {
   const { status, data: session } = useSession();
   const router = useRouter();
@@ -163,10 +145,8 @@ export default function PanelGestionPage() {
     const validateAccess = async () => {
       if (status === 'loading' || !mounted) return;
       if (status === 'unauthenticated') { router.push('/login'); return; }
-
       const token = session?.user?.token || localStorage.getItem('token');
       if (!token) { router.push('/login'); return; }
-
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         const allowedRoles = ['superadmin', 'admin', 'profesor', 'alumno'];
@@ -183,16 +163,13 @@ export default function PanelGestionPage() {
 
   useEffect(() => {
     const fetchUpcomingEvents = async () => {
-      // ✅ CORRECCIÓN: No cargar eventos si el usuario es alumno
       if (userRole === 'alumno') return; 
-      
       try {
         const res = await fetch('/api/calendar/events');
         if (res.ok) {
           const data = await res.json();
           const now = new Date();
           const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-          
           const filtered = data
             .filter((e: any) => {
               const startDate = new Date(e.start);
@@ -200,14 +177,12 @@ export default function PanelGestionPage() {
             })
             .sort((a: any, b: any) => new Date(a.start).getTime() - new Date(b.start).getTime())
             .slice(0, 3);
-            
           setUpcomingEvents(filtered);
         }
       } catch (error) {
         console.error('Error cargando próximos eventos:', error);
       }
     };
-
     if (isAuthorized) fetchUpcomingEvents();
   }, [isAuthorized, userRole]);
 
@@ -221,16 +196,28 @@ export default function PanelGestionPage() {
 
   if (!isAuthorized) return null;
 
+  // ✅ Enlace dinámico según el rol
+  const suggestionHref = userRole === 'alumno' ? '/aula/sugerencias' : '/admin/sugerencias';
+
   const allModules = [
     { title: "Gestión de Usuarios", description: "Administra alumnos, profesores y roles del sistema.", icon: <FaUsers className="w-6 h-6" />, href: "/admin", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["admin", "superadmin"] },
     { title: "Cursos y Materias", description: "Crea y administra tus cursos y revisa a tus alumnos.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["admin", "superadmin", "profesor"] },
     { title: "Mis Cursos", description: "Accede a las clases en vivo, materiales y tareas.", icon: <FaUserGraduate className="w-6 h-6" />, href: "/aula/mis-cursos", color: "from-emerald-600 to-teal-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
-    // ✅ CORRECCIÓN: Eliminado "alumno" de los roles permitidos para el calendario
     { title: "Calendario de Clases", description: "Visualiza y agenda clases, reuniones y fechas importantes.", icon: <FaCalendarAlt className="w-6 h-6" />, href: "/aula/calendario", color: "from-violet-600 to-fuchsia-600", available: true, roles: ["profesor", "admin", "superadmin"] },
     { title: "Catálogo de Cursos", description: "Explora los cursos disponibles e inscríbete.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/cursos-disponibles", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno"] },
     { title: "Ide y Compilador en la Nube", description: "Escribe, compila y ejecuta código en tu navegador.", icon: <FaBookOpen className="w-6 h-6" />, href: "/aula/ide", color: "from-blue-600 to-indigo-600", available: true, roles: ["alumno", "profesor", "admin", "superadmin"] },
     { title: "Tareas y Calificaciones", description: "Revisa entregas de alumnos y gestiona calificaciones.", icon: <FaClipboardCheck className="w-6 h-6" />, href: "/aula/tareas", color: "from-amber-500 to-orange-600", available: false, roles: ["alumno", "profesor", "admin", "superadmin"] },
-    { title: "Configuración", description: "Ajustes generales de la plataforma.", icon: <FaCog className="w-6 h-6" />, href: "/gestion/configuracion", color: "from-slate-600 to-slate-700", available: false, roles: ["admin", "superadmin"] }
+    { title: "Configuración", description: "Ajustes generales de la plataforma.", icon: <FaCog className="w-6 h-6" />, href: "/gestion/configuracion", color: "from-slate-600 to-slate-700", available: false, roles: ["admin", "superadmin"] },
+    // ✅ NUEVO MÓDULO: Buzón de Sugerencias
+    { 
+      title: "Buzón de Sugerencias", 
+      description: userRole === 'alumno' ? "Envía tus comentarios y sugerencias al equipo docente." : "Revisa y gestiona las sugerencias enviadas por los alumnos.", 
+      icon: <FaLightbulb className="w-6 h-6" />, 
+      href: suggestionHref, 
+      color: "from-amber-500 to-orange-600", 
+      available: true, 
+      roles: ["alumno", "profesor", "admin", "superadmin"] 
+    }
   ];
 
   const visibleModules = allModules.filter(module => module.roles.includes(userRole));
@@ -263,7 +250,6 @@ export default function PanelGestionPage() {
           </Link>
         </div>
 
-        {/* ✅ CORRECCIÓN: Solo mostrar alertas si el usuario NO es alumno */}
         {upcomingEvents.length > 0 && userRole !== 'alumno' && (
           <div className="mb-10 animate-in fade-in slide-in-from-top-4 duration-500">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">

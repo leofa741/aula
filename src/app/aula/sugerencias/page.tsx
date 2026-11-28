@@ -21,7 +21,6 @@ export default function StudentSuggestionsPage() {
   
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  
   const [mySuggestions, setMySuggestions] = useState<Suggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
 
@@ -29,7 +28,6 @@ export default function StudentSuggestionsPage() {
     if (status === 'unauthenticated') router.push('/login');
   }, [status, router]);
 
-  // ✅ Cargar las sugerencias enviadas por el alumno
   const fetchMySuggestions = async () => {
     try {
       const res = await fetch('/api/suggestions');
@@ -64,13 +62,12 @@ export default function StudentSuggestionsPage() {
 
       if (res.ok) {
         setMessage('');
-        // ✅ Recargamos la lista para mostrar la nueva sugerencia inmediatamente
-        await fetchMySuggestions();
+        await fetchMySuggestions(); // Recargar la lista inmediatamente
         
         Swal.fire({
           icon: 'success',
           title: '¡Sugerencia enviada!',
-          text: 'Gracias por tu feedback. El equipo docente lo revisará pronto.',
+          text: 'El equipo docente revisará tu mensaje pronto.',
           background: '#0f172a', color: '#f1f5f9', confirmButtonColor: '#10b981', timer: 3000, showConfirmButton: false
         });
       } else {
@@ -93,7 +90,7 @@ export default function StudentSuggestionsPage() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-yellow-500/10 rounded-full blur-3xl opacity-30" />
       </div>
 
-      <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-center gap-4 mb-8 mt-20">
           <button onClick={() => router.push('/gestion')} className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors">
             <FaArrowLeft />
@@ -102,12 +99,12 @@ export default function StudentSuggestionsPage() {
             <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               <FaLightbulb className="text-amber-400" /> Buzón de Sugerencias
             </h1>
-            <p className="text-slate-400 text-sm mt-1">Tu opinión nos ayuda a mejorar el curso. ¡Escríbenos!</p>
+            <p className="text-slate-400 text-sm mt-1">Tu opinión nos ayuda a mejorar. ¡Escríbenos!</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Columna Izquierda: Formulario de Envío */}
+          {/* Formulario de Envío */}
           <div className="lg:col-span-1">
             <div className={`${theme.bgCard} border ${theme.border} rounded-2xl p-6 shadow-xl sticky top-6`}>
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
@@ -120,7 +117,7 @@ export default function StudentSuggestionsPage() {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     required
-                    rows={5}
+                    rows={6}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors resize-none text-sm"
                     placeholder="Ej: Me gustaría que agregáramos más ejercicios prácticos..."
                   />
@@ -138,7 +135,7 @@ export default function StudentSuggestionsPage() {
             </div>
           </div>
 
-          {/* Columna Derecha: Historial de Sugerencias */}
+          {/* Historial de Sugerencias */}
           <div className="lg:col-span-2">
             <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <FaClock className="text-slate-400" /> Mis Sugerencias Enviadas
@@ -163,7 +160,7 @@ export default function StudentSuggestionsPage() {
                         {new Date(sug.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </span>
                       
-                      {/* ✅ LABEL DE ESTADO */}
+                      {/* ✅ ETIQUETA DE ESTADO */}
                       {sug.isRead ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-medium">
                           <FaCheck className="w-3 h-3" /> Leída por el docente

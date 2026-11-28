@@ -4,7 +4,7 @@ import { authOptions } from '@/app/lib/auth';
 import connectDB from '@/app/lib/mongoose';
 import Suggestion from '@/app/models/Suggestion';
 
-// ✅ POST: Crear sugerencia (Alumno)
+// ✅ POST: Crear sugerencia
 export async function POST(req: NextRequest) {
   try {
     await connectDB();
@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { message, courseId } = body;
+    const { message } = body;
 
     if (!message || message.trim() === '') {
       return NextResponse.json({ error: 'El mensaje es obligatorio' }, { status: 400 });
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       studentId: session.user.id,
       studentName: session.user.name || 'Usuario',
       studentEmail: session.user.email || 'sin-email@ejemplo.com',
-      courseId: courseId || null,
       message: message.trim(),
       isRead: false,
     });
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ✅ GET: Obtener sugerencias
+// ✅ GET: Obtener sugerencias (CON .lean() PARA EVITAR ERROR 500)
 export async function GET(req: NextRequest) {
   try {
     await connectDB();
@@ -47,7 +46,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    // Obtenemos el rol de forma segura (a veces viene en el token, a veces en el objeto user)
+    // Obtenemos el rol de forma segura
     const role = (session.user as any).role || 'alumno';
     const isStaff = ['admin', 'superadmin', 'profesor'].includes(role);
 
@@ -57,17 +56,15 @@ export async function GET(req: NextRequest) {
       query = { studentId: session.user.id };
     }
 
-    // ✅ .lean() es CLAVE: convierte el documento de Mongoose a un objeto JS plano, 
-    // evitando errores de serialización al enviarlo como respuesta JSON.
+    // 🔑 LA CLAVE: .lean() convierte el documento de Mongoose en un objeto JS plano,
+    // evitando que NextResponse.json() falle con Error 500 al serializar fechas o IDs.
     const suggestions = await Suggestion.find(query)
       .sort({ createdAt: -1 })
-      .populate('courseId', 'title')
       .lean(); 
       
     return NextResponse.json({ success: true, suggestions }, { status: 200 });
   } catch (error: any) {
     console.error('💥 Error al obtener sugerencias:', error);
-    // Devolvemos el mensaje de error detallado para que puedas verlo en la consola del navegador
     return NextResponse.json({ error: 'Error interno del servidor', details: error.message }, { status: 500 });
   }
 }
